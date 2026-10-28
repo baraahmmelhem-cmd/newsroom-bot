@@ -103,7 +103,7 @@ def write_item(headlines, posted):
             lm.raise_for_status()
             names = [m["name"].split("/")[-1] for m in lm.json().get("models", [])
                      if "generateContent" in m.get("supportedGenerationMethods", [])]
-            print("Models available:", names[:40])
+            print("Models available:", names[:40], flush=True)
             good = [n for n in names if "flash" in n and not any(
                 x in n for x in ("lite", "image", "tts", "live", "audio", "thinking", "exp", "preview"))]
             good.sort(reverse=True)
@@ -112,15 +112,27 @@ def write_item(headlines, posted):
             print("List models failed:", e)
         candidates += ["gemini-flash-latest", "gemini-2.5-flash", "gemini-2.0-flash"]
         text, last = None, None
-        for model in dict.fromkeys(candidates):
-            r = requests.post(f"{base}/models/{model}:generateContent", params={"key": key},
-                              json={"contents": [{"parts": [{"text": prompt}]}]}, timeout=90)
+        for model in list(dict.fromkeys(candidates))[:6]:
+            try:
+                r = requests.post(f"{base}/models/{model}:generateContent", params={"key": key},
+                                  json={"contents": [{"parts": [{"text": prompt}]}],
+                                        "generationConfig": {"maxOutputTokens": 1500}},
+                                  timeout=40)
+            except Exception as e:  # timeout / network: try the next model
+                last = (model, type(e).__name__)
+                print("Model error:", last, flush=True)
+                continue
             if r.ok:
-                print("Using model:", model)
-                text = r.json()["candidates"][0]["content"]["parts"][0]["text"]
-                break
+                try:
+                    text = r.json()["candidates"][0]["content"]["parts"][0]["text"]
+                    print("Using model:", model, flush=True)
+                    break
+                except Exception:
+                    last = (model, "empty reply", r.text[:200])
+                    print("Model bad reply:", last, flush=True)
+                    continue
             last = (model, r.status_code, r.text[:200])
-            print("Model failed:", last)
+            print("Model failed:", last, flush=True)
         if text is None:
             sys.exit(f"No Gemini model worked: {last}")
     return json.loads(text[text.index("{"): text.rindex("}") + 1])
