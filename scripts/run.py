@@ -102,18 +102,37 @@ def write_item(headlines, posted):
     return json.loads(text[text.index("{"): text.rindex("}") + 1])
 
 
+SITE = "https://www.mr-amwal.com"
+# Observed from the newsroom page: POST /api/newsroom/news with JSON keys
+# title, body, tag, hours, hot, push; Content-Type only (auth is a session cookie
+# that the private link /newsroom?u=<key> sets).  The exact "tag" values were not
+# captured yet, so we try the Arabic label first, then likely slugs.
+TAG_SLUGS = {"كريبتو": ["crypto"], "اقتصاد": ["economy", "economics"],
+             "عاجل": ["urgent", "breaking"], "تنبيه": ["alert"]}
+
+
 def publish(item):
-    """ADJUST THIS to match your newsroom's real API (ask the site developer).
-    Field names below are placeholders."""
-    r = requests.post(
-        env("NEWSROOM_API_URL"),
-        headers={"Authorization": f"Bearer {env('NEWSROOM_API_TOKEN')}",
-                 "content-type": "application/json"},
-        json={"title": item["title"], "body": item["body"],
-              "category": item["category"], "visibleHours": 24,
-              "important": False, "notify": True},
-        timeout=30)
+    key = env("NEWSROOM_KEY")
+    s = requests.Session()
+    s.headers["User-Agent"] = "Mozilla/5.0 newsroom-bot"
+    r = s.get(f"{SITE}/newsroom", params={"u": key}, timeout=30)
     r.raise_for_status()
+    print("Session cookies set:", sorted(s.cookies.keys()))  # names only, never values
+    label = item["category"]
+    last = None
+    for tag in [label] + TAG_SLUGS.get(label, []):
+        payload = {"title": item["title"], "body": item["body"], "tag": tag,
+                   "hours": 24, "hot": False, "push": True}
+        r = s.post(f"{SITE}/api/newsroom/news", json=payload,
+                   headers={"Origin": SITE, "Referer": f"{SITE}/newsroom"}, timeout=30)
+        if r.ok:
+            print("Posted with tag:", tag)
+            return
+        last = (r.status_code, r.text[:200])
+        print("Publish failed:", last, "tag:", tag)
+        if r.status_code in (401, 403):
+            break
+    sys.exit(f"Publish failed: {last}")
 
 
 def main():
