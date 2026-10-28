@@ -23,10 +23,8 @@ jobs:
       - run: pip install requests
       - name: Write and publish one news item
         env:
-          CRYPTOPANIC_API_KEY: ${{ secrets.CRYPTOPANIC_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          NEWSROOM_API_URL: ${{ secrets.NEWSROOM_API_URL }}
-          NEWSROOM_API_TOKEN: ${{ secrets.NEWSROOM_API_TOKEN }}
+          NEWSROOM_KEY: ${{ secrets.NEWSROOM_KEY }}
         run: python scripts/run.py
       - name: Save anti-repeat memory
         run: |
