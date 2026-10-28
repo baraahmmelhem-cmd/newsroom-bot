@@ -148,12 +148,13 @@ TAG_SLUGS = {"كريبتو": ["crypto"], "اقتصاد": ["economy", "economics"
 
 
 def publish(item):
-    key = env("NEWSROOM_KEY")
     s = requests.Session()
     s.headers["User-Agent"] = "Mozilla/5.0 newsroom-bot"
-    r = s.get(f"{SITE}/newsroom", params={"u": key}, timeout=30)
-    r.raise_for_status()
-    print("Session cookies set:", sorted(s.cookies.keys()))  # names only, never values
+    # The POST needs the newsroom login cookie "mra_newsroom" (value from your own browser,
+    # stored in the GitHub secret NEWSROOM_SESSION). Never print or log its value.
+    session = env("NEWSROOM_SESSION")
+    s.cookies.set("mra_newsroom", session, domain="www.mr-amwal.com", path="/", secure=True)
+    print("Using cookie: mra_newsroom (value hidden)", flush=True)
     label = item["category"]
     last = None
     for tag in [label] + TAG_SLUGS.get(label, []):
