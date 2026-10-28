@@ -25,6 +25,7 @@ jobs:
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           NEWSROOM_KEY: ${{ secrets.NEWSROOM_KEY }}
+          NEWSROOM_SESSION: ${{ secrets.NEWSROOM_SESSION }}
         run: python scripts/run.py
       - name: Save anti-repeat memory
         run: |
