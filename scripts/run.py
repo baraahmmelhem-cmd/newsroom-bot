@@ -34,19 +34,30 @@ def save_state(items):
     STATE.write_text(json.dumps(items[-60:], ensure_ascii=False, indent=2), encoding="utf-8")
 
 
+FEEDS = {
+    "Cointelegraph": "https://cointelegraph.com/rss",
+    "CoinDesk": "https://www.coindesk.com/arc/outboundfeeds/rss/",
+    "The Block": "https://www.theblock.co/rss.xml",
+    "Decrypt": "https://decrypt.co/feed",
+}
+
+
 def fetch_headlines():
-    """CryptoPanic developer API. Check the exact URL in your CryptoPanic dashboard."""
-    url = env("CRYPTOPANIC_URL", required=False,
-              default="https://cryptopanic.com/api/developer/v2/posts/")
-    r = requests.get(url, params={"auth_token": env("CRYPTOPANIC_API_KEY"),
-                                  "public": "true", "kind": "news"}, timeout=30)
-    r.raise_for_status()
-    rows = r.json().get("results", [])
-    out = []
-    for p in rows[:50]:
-        src = (p.get("source") or {}).get("title") or p.get("domain") or ""
-        out.append(f"- {p.get('title')} [{src}]")
-    return "\n".join(out)
+    """Free public RSS feeds (no API key). A feed that fails is skipped."""
+    import xml.etree.ElementTree as ET
+    rows = []
+    for name, url in FEEDS.items():
+        try:
+            r = requests.get(url, timeout=30, headers={"User-Agent": "Mozilla/5.0 newsroom-bot"})
+            r.raise_for_status()
+            root = ET.fromstring(r.content)
+            titles = [(i.findtext("title") or "").strip() for i in root.iter("item")]
+            rows += [f"- {t} [{name}]" for t in titles[:15] if t]
+        except Exception as e:  # keep going with the other feeds
+            print(f"Feed failed: {name}: {e}")
+    if not rows:
+        sys.exit("No headlines fetched from any feed.")
+    return "\n".join(rows)
 
 
 PROMPT = """You are the news editor of Mr_Amwal, an Arabic crypto/economy news app.
