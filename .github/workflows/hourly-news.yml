@@ -1,0 +1,36 @@
+name: Hourly Mr_Amwal news
+
+on:
+  schedule:
+    - cron: "35 * * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: hourly-news
+  cancel-in-progress: false
+
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install requests
+      - name: Write and publish one news item
+        env:
+          CRYPTOPANIC_API_KEY: ${{ secrets.CRYPTOPANIC_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          NEWSROOM_API_URL: ${{ secrets.NEWSROOM_API_URL }}
+          NEWSROOM_API_TOKEN: ${{ secrets.NEWSROOM_API_TOKEN }}
+        run: python scripts/run.py
+      - name: Save anti-repeat memory
+        run: |
+          git config user.name "newsroom-bot"
+          git config user.email "bot@users.noreply.github.com"
+          git add posted.json || true
+          git diff --cached --quiet || (git commit -m "Update posted list" && git push)
