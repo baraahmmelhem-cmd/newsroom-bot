@@ -92,13 +92,37 @@ def write_item(headlines, posted):
         r.raise_for_status()
         text = r.json()["content"][0]["text"]
     else:
-        model = env("GEMINI_MODEL", required=False, default="gemini-2.5-flash")
-        r = requests.post(
-            f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
-            params={"key": env("GEMINI_API_KEY")},
-            json={"contents": [{"parts": [{"text": prompt}]}]}, timeout=90)
-        r.raise_for_status()
-        text = r.json()["candidates"][0]["content"]["parts"][0]["text"]
+        key = env("GEMINI_API_KEY")
+        base = "https://generativelanguage.googleapis.com/v1beta"
+        candidates = []
+        if os.environ.get("GEMINI_MODEL"):
+            candidates.append(os.environ["GEMINI_MODEL"])
+        # Ask Google which models this key can use, so a retired model name never breaks us.
+        try:
+            lm = requests.get(f"{base}/models", params={"key": key, "pageSize": 200}, timeout=30)
+            lm.raise_for_status()
+            names = [m["name"].split("/")[-1] for m in lm.json().get("models", [])
+                     if "generateContent" in m.get("supportedGenerationMethods", [])]
+            print("Models available:", names[:40])
+            good = [n for n in names if "flash" in n and not any(
+                x in n for x in ("lite", "image", "tts", "live", "audio", "thinking", "exp", "preview"))]
+            good.sort(reverse=True)
+            candidates += good[:3] + [n for n in names if "flash" in n and n not in good][:2]
+        except Exception as e:
+            print("List models failed:", e)
+        candidates += ["gemini-flash-latest", "gemini-2.5-flash", "gemini-2.0-flash"]
+        text, last = None, None
+        for model in dict.fromkeys(candidates):
+            r = requests.post(f"{base}/models/{model}:generateContent", params={"key": key},
+                              json={"contents": [{"parts": [{"text": prompt}]}]}, timeout=90)
+            if r.ok:
+                print("Using model:", model)
+                text = r.json()["candidates"][0]["content"]["parts"][0]["text"]
+                break
+            last = (model, r.status_code, r.text[:200])
+            print("Model failed:", last)
+        if text is None:
+            sys.exit(f"No Gemini model worked: {last}")
     return json.loads(text[text.index("{"): text.rindex("}") + 1])
 
 
