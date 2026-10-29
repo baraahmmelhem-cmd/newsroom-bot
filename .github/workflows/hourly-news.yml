@@ -1,8 +1,11 @@
 name: Hourly news
 on:
   schedule:
-    - cron: "35 * * * *"
+    - cron: "5,35,50 * * * *"
   workflow_dispatch:
+concurrency:
+  group: newsroom
+  cancel-in-progress: false
 permissions:
   contents: write
 jobs:
@@ -24,5 +27,5 @@ jobs:
         run: |
           git config user.name "newsroom-bot"
           git config user.email "bot@users.noreply.github.com"
-          git add posted.json
-          git diff --staged --quiet || (git commit -m "Update posted.json" && git push)
+          git add -A
+          git diff --staged --quiet || (git commit -m "Update posted.json" && git pull --rebase && git push)
