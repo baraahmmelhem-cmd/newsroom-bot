@@ -129,7 +129,7 @@ def write_item(headlines, posted):
             try:
                 r = requests.post(f"{base}/models/{model}:generateContent", params={"key": key},
                                   json={"contents": [{"parts": [{"text": prompt}]}],
-                                        "generationConfig": {"maxOutputTokens": 1500}},
+                                        "generationConfig": {"maxOutputTokens": 4000, "responseMimeType": "application/json"}},
                                   timeout=40)
             except Exception as e:  # timeout / network: try the next model
                 last = (model, type(e).__name__)
@@ -137,7 +137,10 @@ def write_item(headlines, posted):
                 continue
             if r.ok:
                 try:
-                    text = r.json()["candidates"][0]["content"]["parts"][0]["text"]
+                    parts = r.json()["candidates"][0]["content"]["parts"]
+                    cand = "".join(p.get("text", "") for p in parts)
+                    json.loads(cand[cand.index("{"): cand.rindex("}") + 1])  # must be valid JSON
+                    text = cand
                     print("Using model:", model, flush=True)
                     break
                 except Exception:
