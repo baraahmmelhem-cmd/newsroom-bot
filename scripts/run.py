@@ -9,11 +9,14 @@ All secrets come from environment variables (GitHub Actions Secrets).
 import json
 import os
 import sys
+import time
 from pathlib import Path
 
 import requests
 
 STATE = Path(__file__).resolve().parent.parent / "posted.json"
+LAST = Path(__file__).resolve().parent.parent / "last_post.txt"
+MIN_GAP_MIN = 40  # backup schedules skip if something was posted more recently
 MODEL = os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-5-5")
 
 
@@ -188,7 +191,17 @@ def publish(item):
     sys.exit(f"Publish failed: {last}")
 
 
+def recently_posted():
+    try:
+        return (time.time() - float(LAST.read_text().strip())) < MIN_GAP_MIN * 60
+    except Exception:
+        return False
+
+
 def main():
+    if os.environ.get("GITHUB_EVENT_NAME") == "schedule" and recently_posted():
+        print(f"Posted less than {MIN_GAP_MIN} min ago; skipping this run.")
+        return
     posted = load_state()
     item = write_item(fetch_headlines(), posted)
     if item.get("skip"):
@@ -197,6 +210,7 @@ def main():
     publish(item)
     posted.append(item["title"])
     save_state(posted)
+    LAST.write_text(str(int(time.time())))
     print("Published:", item["title"])
 
 
