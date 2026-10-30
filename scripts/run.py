@@ -75,17 +75,20 @@ TASK: choose the single STRONGEST high-impact story that is NOT a repeat. Priori
 moves, Fed/rates/inflation data, spot ETF flows, major regulation or court rulings, large
 institutional moves, major hacks, oil/gold/dollar moves, US-China. Skip small altcoins,
 memecoins, games, ads, opinion pieces, price-prediction clickbait.
+ONLY topics about the USA, China, Trump, or crypto/markets. NEVER pick anything about Europe
+(ECB, Lagarde, EU, eurozone, European countries or companies) or Israel; skip those entirely.
 
 FACTS: use ONLY facts present in the headlines above. Never invent numbers, names or quotes.
 If a detail is not in the headlines, leave it out.
 
 WRITING (Modern Standard Arabic, natural news style, correct grammar):
-- title: 4 to 8 words, strong and specific, includes the key number or name, no quotes, no emoji.
-- body: 2 short sentences: (1) what happened, with the key figure; (2) context or why it matters.
-  Then a NEW line that starts exactly with "ماذا يعني للمتداول:" followed by ONE balanced
-  sentence (no buy/sell advice, no hype).
-- Keep the whole body under 330 characters. No source line. No hashtags. Write company/coin
-  names as usual (BTC, ETH, XRP, Fed written "الفيدرالي").
+- Style: like a phone news push notification: a punchy headline, then ONE short sentence.
+- title: max 10 words, starts with one fitting emoji (🚨 breaking, 📉/📈 price moves, 🏦 regulation
+  or central banks, 🔐 hacks, 💵 US economy data, 🇨🇳 China); for truly breaking news put
+  "عاجل:" right after the emoji. The headline alone must tell the story. No quotes.
+- body: ONE short sentence only (max 25 words) with the key figure or detail. NO
+  "ماذا يعني للمتداول" line, NO price line, NO source line, no buy/sell advice, no hashtags.
+  Write company/coin names as usual (BTC, ETH, XRP, Fed written "الفيدرالي").
 - category: "عاجل" only for truly breaking market-moving news; otherwise "كريبتو" for crypto
   or "اقتصاد" for macro; "تنبيه" for security/risk warnings.
 
