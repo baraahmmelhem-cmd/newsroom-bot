@@ -75,6 +75,9 @@ TASK: choose the single STRONGEST high-impact story that is NOT a repeat. Priori
 moves, Fed/rates/inflation data, spot ETF flows, major regulation or court rulings, large
 institutional moves, major hacks, oil/gold/dollar moves, US-China. Skip small altcoins,
 memecoins, games, ads, opinion pieces, price-prediction clickbait.
+TOP PRIORITY (post these first, the moment they appear in the headlines): US weekly/monthly
+economic decisions and data: Fed rate decision, jobs/NFP, CPI/inflation, PCE, GDP, housing data.
+Also top priority: a major hack of an exchange, an exchange collapse, or any shock moving the market.
 ONLY topics about the USA, China, Trump, or crypto/markets. NEVER pick anything about Europe
 (ECB, Lagarde, EU, eurozone, European countries or companies) or Israel; skip those entirely.
 
@@ -93,7 +96,9 @@ WRITING (Modern Standard Arabic, natural news style, correct grammar):
   or "اقتصاد" for macro; "تنبيه" for security/risk warnings.
 
 Reply with JSON only, no markdown fences:
-{{"skip": false, "title": "...", "body": "...", "category": "كريبتو|اقتصاد|عاجل|تنبيه"}}
+{{"skip": false, "title": "...", "body": "...", "category": "كريبتو|اقتصاد|عاجل|تنبيه", "hot": false}}
+Set "hot": true ONLY for truly urgent, market-moving news (major exchange hack, Fed decision,
+big US data release); otherwise false.
 If every strong story is already published, reply {{"skip": true}}."""
 
 
@@ -181,7 +186,7 @@ def publish(item):
     last = None
     for tag in [label] + TAG_SLUGS.get(label, []):
         payload = {"title": item["title"], "body": item["body"], "tag": tag,
-                   "hours": 24, "hot": False, "push": True}
+                   "hours": 24, "hot": bool(item.get("hot")) or label == "عاجل", "push": True}
         r = s.post(f"{SITE}/api/newsroom/news", json=payload,
                    headers={"Origin": SITE, "Referer": f"{SITE}/newsroom"}, timeout=30)
         if r.ok:
