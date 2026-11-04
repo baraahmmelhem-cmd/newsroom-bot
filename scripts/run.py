@@ -78,6 +78,11 @@ memecoins, games, ads, opinion pieces, price-prediction clickbait.
 TOP PRIORITY (post these first, the moment they appear in the headlines): US weekly/monthly
 economic decisions and data: Fed rate decision, jobs/NFP, CPI/inflation, PCE, GDP, housing data.
 Also top priority: a major hack of an exchange, an exchange collapse, or any shock moving the market.
+BITCOIN DIRECTION (TOP PRIORITY): if the headlines show BTC rising/surging/recovering/breaking a
+level, post that rise as the story right away. CONSISTENCY: look at the "Already published" list;
+never publish a story that contradicts the current BTC direction in the headlines (do not write
+"BTC falls/drops" when the latest headlines show it rising, and vice versa). If an older published
+item is now outdated, write the new development as an update ("يرتد", "يتعافى") instead.
 ONLY topics about the USA, China, Trump, or crypto/markets. NEVER pick anything about Europe
 (ECB, Lagarde, EU, eurozone, European countries or companies) or Israel; skip those entirely.
 
@@ -92,8 +97,12 @@ WRITING (Modern Standard Arabic, natural news style, correct grammar):
 - body: ONE short sentence only (max 25 words) with the key figure or detail. NO
   "ماذا يعني للمتداول" line, NO price line, NO source line, no buy/sell advice, no hashtags.
   Write company/coin names as usual (BTC, ETH, XRP, Fed written "الفيدرالي").
-- category: "عاجل" only for truly breaking market-moving news; otherwise "كريبتو" for crypto
-  or "اقتصاد" for macro; "تنبيه" for security/risk warnings.
+- category: "عاجل" is RARE (at most 1-2 per day): only a Fed decision, a major US data release,
+  a major exchange hack or a market shock. Normal news is "كريبتو" for crypto or "اقتصاد" for
+  macro; "تنبيه" for security/risk warnings. Do not put "عاجل:" in the title of normal news.
+- REPEATS: a story about the same company/figure/event as ANY item in the published list is a
+  repeat even if worded differently (e.g. the same Tether 150k BTC or CFTC perpetual-futures
+  story). Never publish the same event twice.
 
 Reply with JSON only, no markdown fences:
 {{"skip": false, "title": "...", "body": "...", "category": "كريبتو|اقتصاد|عاجل|تنبيه", "hot": false}}
@@ -105,7 +114,7 @@ If every strong story is already published, reply {{"skip": true}}."""
 def write_item(headlines, posted):
     """Uses Google Gemini (free tier) by default; set LLM=anthropic to use Claude instead (paid)."""
     prompt = PROMPT.format(headlines=headlines,
-                           posted="\n".join(f"- {t}" for t in posted[-30:]) or "(none)")
+                           posted="\n".join(f"- {t}" for t in posted[-60:]) or "(none)")
     if env("LLM", required=False, default="gemini") == "anthropic":
         r = requests.post(
             "https://api.anthropic.com/v1/messages",
@@ -186,7 +195,7 @@ def publish(item):
     last = None
     for tag in [label] + TAG_SLUGS.get(label, []):
         payload = {"title": item["title"], "body": item["body"], "tag": tag,
-                   "hours": 24, "hot": bool(item.get("hot")) or label == "عاجل", "push": True}
+                   "hours": 24, "hot": bool(item.get("hot")), "push": True}
         r = s.post(f"{SITE}/api/newsroom/news", json=payload,
                    headers={"Origin": SITE, "Referer": f"{SITE}/newsroom"}, timeout=30)
         if r.ok:
