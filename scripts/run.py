@@ -45,27 +45,106 @@ FEEDS = {
 }
 
 
+FRESH_HOURS = 2  # only headlines published in the last N hours are considered
+
+
 def fetch_headlines():
-    """Free public RSS feeds (no API key). A feed that fails is skipped."""
+    """Free public RSS feeds (no API key). Keeps ONLY fresh items, newest first, with their age."""
     import xml.etree.ElementTree as ET
-    rows = []
+    from email.utils import parsedate_to_datetime
+    from datetime import datetime, timezone
+    now = datetime.now(timezone.utc)
+    items = []
     for name, url in FEEDS.items():
         try:
             r = requests.get(url, timeout=30, headers={"User-Agent": "Mozilla/5.0 newsroom-bot"})
             r.raise_for_status()
             root = ET.fromstring(r.content)
-            titles = [(i.findtext("title") or "").strip() for i in root.iter("item")]
-            rows += [f"- {t} [{name}]" for t in titles[:15] if t]
+            for i in root.iter("item"):
+                t = (i.findtext("title") or "").strip()
+                try:
+                    when = parsedate_to_datetime(i.findtext("pubDate") or "")
+                    if when.tzinfo is None:
+                        when = when.replace(tzinfo=timezone.utc)
+                except Exception:
+                    continue  # no reliable date -> skip, we cannot prove it is fresh
+                age_min = (now - when).total_seconds() / 60
+                if t and 0 <= age_min <= FRESH_HOURS * 60:
+                    items.append((age_min, f"- ({int(age_min)} min ago) {t} [{name}]"))
         except Exception as e:  # keep going with the other feeds
             print(f"Feed failed: {name}: {e}")
-    if not rows:
-        sys.exit("No headlines fetched from any feed.")
-    return "\n".join(rows)
+    items.sort()
+    print(f"Fresh headlines (last {FRESH_HOURS}h):", len(items), flush=True)
+    return "\n".join(row for _, row in items[:40])
+
+
+def live_btc():
+    """Current BTC price and 24h change (CoinGecko, then Coinbase as backup)."""
+    try:
+        r = requests.get("https://api.coingecko.com/api/v3/simple/price",
+                         params={"ids": "bitcoin", "vs_currencies": "usd",
+                                 "include_24hr_change": "true"}, timeout=20)
+        r.raise_for_status()
+        d = r.json()["bitcoin"]
+        return f"BTC now ${d['usd']:,.0f} ({d['usd_24h_change']:+.1f}% in 24h, CoinGecko)"
+    except Exception as e:
+        print("CoinGecko failed:", e)
+    try:
+        r = requests.get("https://api.coinbase.com/v2/prices/BTC-USD/spot", timeout=20)
+        r.raise_for_status()
+        return f"BTC now ${float(r.json()['data']['amount']):,.0f} (Coinbase spot)"
+    except Exception as e:
+        print("Coinbase failed:", e)
+    return None
+
+
+UP = ("ارتفاع", "يرتفع", "ترتفع", "ترتد", "يرتد", "تتجاوز", "يتجاوز", "متجاوز", "تقفز", "يقفز",
+      "قفز", "تعاف", "يتعافى", "صعود", "تصعد", "يصعد", "تستعيد", "يستعيد", "مكاسب")
+DOWN = ("هبوط", "يهبط", "تهبط", "تراجع", "يتراجع", "تتراجع", "انخفاض", "ينخفض", "تنخفض",
+        "دون", "تحت", "خسائر", "تخسر", "يخسر", "انهيار", "تصفية")
+
+
+def _direction(s):
+    up, down = any(w in s for w in UP), any(w in s for w in DOWN)
+    return "up" if up and not down else "down" if down and not up else None
+
+
+def _words(s):
+    import re
+    stop = {"في", "من", "إلى", "على", "بعد", "مع", "عن", "فوق", "دولار", "عاجل", "ألف", "مليون",
+            "مليار", "the", "a", "to"}
+    out = set()
+    for w in re.findall(r"\d+|[\w؀-ۿ]{3,}", s.lower()):
+        if w.startswith("ال") and len(w) > 4:
+            w = w[2:]  # الانتخابات -> انتخابات
+        if w not in stop:
+            out.add(w)
+    return out
+
+
+def is_repeat(title, posted, threshold=0.5):
+    """Hard duplicate check in code: many shared words with a recent title, in the SAME
+    direction (a rise after a fall is a real new development, not a repeat)."""
+    new, d_new = _words(title), _direction(title)
+    for old in posted[-15:]:
+        o = _words(old)
+        d_old = _direction(old)
+        if d_new and d_old and d_new != d_old:
+            continue
+        if new and o and len(new & o) / min(len(new), len(o)) >= threshold:
+            return old
+    return None
 
 
 PROMPT = """You are the senior Arabic news editor of Mr_Amwal, a crypto/economy app for Arab traders.
-Recent headlines (newest first):
+LIVE MARKET RIGHT NOW: {btc}
+Any story about the Bitcoin price MUST agree with this live price: never say BTC is above a level
+it is now below (or rising when the live 24h change is negative), and use this live price, not an
+older number from a headline. If a headline's price claim no longer matches, skip that story.
+
+Fresh headlines from the last 2 hours only (newest first, age in minutes):
 {headlines}
+Prefer the newest headlines. Never post an event that happened earlier than these.
 
 Already published on the site (the SAME event or the same topic, e.g. another Fed-decision
 item, is a REPEAT; only a genuinely new development counts as new):
@@ -111,9 +190,9 @@ big US data release); otherwise false.
 If every strong story is already published, reply {{"skip": true}}."""
 
 
-def write_item(headlines, posted):
+def write_item(headlines, posted, btc):
     """Uses Google Gemini (free tier) by default; set LLM=anthropic to use Claude instead (paid)."""
-    prompt = PROMPT.format(headlines=headlines,
+    prompt = PROMPT.format(headlines=headlines, btc=btc,
                            posted="\n".join(f"- {t}" for t in posted[-60:]) or "(none)")
     if env("LLM", required=False, default="gemini") == "anthropic":
         r = requests.post(
@@ -137,15 +216,21 @@ def write_item(headlines, posted):
             names = [m["name"].split("/")[-1] for m in lm.json().get("models", [])
                      if "generateContent" in m.get("supportedGenerationMethods", [])]
             print("Models available:", names[:40], flush=True)
-            good = [n for n in names if "flash" in n and not any(
-                x in n for x in ("lite", "image", "tts", "live", "audio", "thinking", "exp", "preview"))]
-            good.sort(reverse=True)
-            candidates += good[:3] + [n for n in names if "flash" in n and n not in good][:2]
+            bad = ("image", "tts", "live", "audio", "embedding", "vision", "omni", "veo", "imagen")
+            usable = [n for n in names if not any(x in n for x in bad)]
+            # Stable aliases first (they follow Google's current free models), then the rest.
+            candidates += [n for n in ("gemini-flash-lite-latest", "gemini-flash-latest")
+                           if n in usable]
+            candidates += [n for n in usable if "flash" in n]
+            candidates += [n for n in usable if n.startswith("gemma")]
+            candidates += [n for n in usable if "pro" in n]
         except Exception as e:
             print("List models failed:", e)
-        candidates += ["gemini-flash-latest", "gemini-2.5-flash", "gemini-2.0-flash"]
+        candidates += ["gemini-flash-lite-latest", "gemini-flash-latest", "gemini-pro-latest"]
         text, last = None, None
-        for model in list(dict.fromkeys(candidates))[:6]:
+        for attempt, model in enumerate(list(dict.fromkeys(candidates))[:14]):
+            if attempt:
+                time.sleep(3)  # brief pause helps with "high demand" (503) errors
             try:
                 r = requests.post(f"{base}/models/{model}:generateContent", params={"key": key},
                                   json={"contents": [{"parts": [{"text": prompt}]}],
@@ -220,9 +305,22 @@ def main():
         print(f"Posted less than {MIN_GAP_MIN} min ago; skipping this run.")
         return
     posted = load_state()
-    item = write_item(fetch_headlines(), posted)
+    headlines = fetch_headlines()
+    if not headlines:
+        print("No fresh headlines in the last few hours; nothing published.")
+        return
+    btc = live_btc()
+    if not btc:
+        print("Could not get a live BTC price; not publishing (cannot check consistency).")
+        return
+    print(btc, flush=True)
+    item = write_item(headlines, posted, btc)
     if item.get("skip"):
         print("No new strong story; nothing published.")
+        return
+    dup = is_repeat(item.get("title", ""), posted)
+    if dup:
+        print("Skipped as repeat of:", dup)
         return
     publish(item)
     posted.append(item["title"])
