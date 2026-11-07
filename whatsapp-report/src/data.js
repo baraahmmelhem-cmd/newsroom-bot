@@ -1,0 +1,104 @@
+// Fetches live market data from free, keyless sources.
+// Every figure on the card comes from here; nothing is invented.
+// If a source fails, its field becomes null and the card shows "—".
+
+const UA = { 'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120 Safari/537.36', 'Accept': 'application/json,text/plain,*/*' };
+
+async function getJSON(url, opts = {}) {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), 20000);
+  try {
+    const r = await fetch(url, { headers: UA, signal: ctrl.signal, ...opts });
+    if (!r.ok) throw new Error(`${r.status} ${url}`);
+    return await r.json();
+  } finally { clearTimeout(t); }
+}
+
+async function safe(name, fn) {
+  try { return await fn(); }
+  catch (e) { console.warn(`[data] ${name} failed: ${e.message}`); return null; }
+}
+
+// --- Crypto: CoinGecko (free, no key) -------------------------------------
+async function crypto() {
+  const url = 'https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=bitcoin,ethereum,ripple&sparkline=true&price_change_percentage=24h';
+  const rows = await getJSON(url);
+  const by = Object.fromEntries(rows.map(r => [r.id, r]));
+  const pick = (id, sym, name) => by[id] ? {
+    sym, name,
+    price: by[id].current_price,
+    change: by[id].price_change_percentage_24h,
+    spark: (by[id].sparkline_in_7d?.price || []).slice(-48) // last ~48h
+  } : { sym, name, price: null, change: null, spark: [] };
+  return [pick('bitcoin', 'BTC', 'Bitcoin'), pick('ethereum', 'ETH', 'Ethereum'), pick('ripple', 'XRP', 'Ripple')];
+}
+
+async function global() {
+  const g = (await getJSON('https://api.coingecko.com/api/v3/global')).data;
+  return {
+    mcapChange: g.market_cap_change_percentage_24h_usd,
+    mcapUsd: g.total_market_cap?.usd,
+    btcDominance: g.market_cap_percentage?.btc
+  };
+}
+
+// --- Fear & Greed: alternative.me (free, no key) ---------------------------
+async function fearGreed() {
+  const d = await getJSON('https://api.alternative.me/fng/?limit=1');
+  const v = d.data?.[0];
+  return v ? { value: Number(v.value), label: v.value_classification } : null;
+}
+
+// --- Gold & Brent: Yahoo Finance chart endpoint (free, no key) -------------
+async function yahoo(symbol) {
+  const u = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=5d&interval=1d`;
+  const d = await getJSON(u);
+  const m = d.chart?.result?.[0]?.meta;
+  if (!m?.regularMarketPrice) throw new Error('no price');
+  const prev = m.chartPreviousClose || m.previousClose;
+  const change = prev ? ((m.regularMarketPrice / prev) - 1) * 100 : null;
+  const closes = (d.chart.result[0].indicators?.quote?.[0]?.close || []).filter(x => x != null);
+  return { price: m.regularMarketPrice, change, spark: closes };
+}
+
+// --- News headlines (English RSS) for the optional AI summary ---------------
+const FEEDS = [
+  'https://www.coindesk.com/arc/outboundfeeds/rss/',
+  'https://cointelegraph.com/rss',
+  'https://feeds.content.dowjones.io/public/rss/mw_topstories'
+];
+async function headlines() {
+  const out = [];
+  for (const f of FEEDS) {
+    try {
+      const r = await fetch(f, { headers: UA });
+      const xml = await r.text();
+      const items = [...xml.matchAll(/<item>([\s\S]*?)<\/item>/g)].slice(0, 12);
+      for (const it of items) {
+        const title = (it[1].match(/<title>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/title>/) || [])[1];
+        const date = (it[1].match(/<pubDate>([\s\S]*?)<\/pubDate>/) || [])[1];
+        if (!title) continue;
+        const age = date ? (Date.now() - new Date(date).getTime()) / 36e5 : 0;
+        if (age <= 30) out.push({ title: title.trim(), source: new URL(f).hostname.replace('www.', ''), hoursAgo: Math.round(age) });
+      }
+    } catch (e) { console.warn(`[data] feed failed ${f}: ${e.message}`); }
+  }
+  return out.slice(0, 30);
+}
+
+async function fetchAll() {
+  const [c, g, fg, gold, brent, news] = await Promise.all([
+    safe('crypto', crypto), safe('global', global), safe('fearGreed', fearGreed),
+    safe('gold', () => yahoo('GC=F')), safe('brent', () => yahoo('BZ=F')), safe('headlines', headlines)
+  ]);
+  return {
+    crypto: c || [],
+    global: g,
+    fearGreed: fg,
+    gold: gold ? { sym: 'XAU', name: 'Gold / oz', ...gold } : { sym: 'XAU', name: 'Gold / oz', price: null, change: null, spark: [] },
+    brent: brent ? { sym: 'BRENT', name: 'Crude', ...brent } : { sym: 'BRENT', name: 'Crude', price: null, change: null, spark: [] },
+    headlines: news || []
+  };
+}
+
+module.exports = { fetchAll };

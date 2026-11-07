@@ -1,0 +1,84 @@
+name: WhatsApp Morning Report
+
+on:
+  schedule:
+    - cron: '0 4 * * *'        # 07:00 Amman (UTC+3) every day
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'pair = ربط واتساب لأول مرة · send = إرسال التقرير الآن'
+        required: true
+        default: 'send'
+        type: choice
+        options: [send, pair]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: whatsapp-report
+  cancel-in-progress: false
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      WHATSAPP_PHONE: ${{ secrets.WHATSAPP_PHONE }}
+      SESSION_KEY: ${{ secrets.SESSION_KEY }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      MODE: ${{ github.event.inputs.mode || 'send' }}
+    defaults:
+      run:
+        working-directory: whatsapp-report
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Arabic fonts
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq fonts-noto-core fonts-noto-mono fonts-hosny-amiri > /dev/null
+
+      - name: Install
+        run: npm install --no-audit --no-fund
+
+      - name: Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Restore WhatsApp session
+        run: |
+          if [ -f wa-session.enc ]; then
+            if [ -z "$SESSION_KEY" ]; then echo "SESSION_KEY secret missing"; exit 1; fi
+            openssl enc -d -aes-256-cbc -pbkdf2 -pass env:SESSION_KEY -in wa-session.enc | tar xz
+            echo "session restored"
+          else
+            echo "no saved session yet"
+          fi
+
+      - name: Run (${{ env.MODE }})
+        run: node src/index.js "$MODE"
+
+      - name: Save WhatsApp session
+        if: always()
+        run: |
+          if [ -d wa-session ] && [ -f wa-session/creds.json ]; then
+            tar cz wa-session | openssl enc -aes-256-cbc -pbkdf2 -salt -pass env:SESSION_KEY -out wa-session.enc
+            git config user.name "whatsapp-report-bot"
+            git config user.email "bot@users.noreply.github.com"
+            git add wa-session.enc
+            if ! git diff --cached --quiet; then
+              git commit -m "chore: update WhatsApp session [skip ci]"
+              git pull --rebase --autostash origin "${GITHUB_REF_NAME}" || true
+              git push
+            fi
+          fi
+
+      - name: Upload card
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: report-card
+          path: whatsapp-report/out/report.png
+          if-no-files-found: ignore

@@ -1,0 +1,23 @@
+{
+  "name": "mr-amwal-whatsapp-report",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Daily Arabic market report card sent to the owner's own WhatsApp chat",
+  "main": "src/index.js",
+  "scripts": {
+    "pair": "node src/index.js pair",
+    "send": "node src/index.js send",
+    "render": "node src/index.js render"
+  },
+  "dependencies": {
+    "@hapi/boom": "^10.0.1",
+    "@whiskeysockets/baileys": "^6.7.16",
+    "jimp": "^0.16.13",
+    "pino": "^9.5.0",
+    "playwright": "^1.49.0",
+    "qrcode-terminal": "^0.12.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
