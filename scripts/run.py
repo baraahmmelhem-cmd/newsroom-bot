@@ -16,7 +16,7 @@ import requests
 
 STATE = Path(__file__).resolve().parent.parent / "posted.json"
 LAST = Path(__file__).resolve().parent.parent / "last_post.txt"
-MIN_GAP_MIN = 40  # backup schedules skip if something was posted more recently
+MIN_GAP_MIN = 15  # backup schedules skip if something was posted more recently
 MODEL = os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-5-5")
 
 
@@ -42,6 +42,15 @@ FEEDS = {
     "CoinDesk": "https://www.coindesk.com/arc/outboundfeeds/rss/",
     "The Block": "https://www.theblock.co/rss.xml",
     "Decrypt": "https://decrypt.co/feed",
+    "Bitcoin Magazine": "https://bitcoinmagazine.com/feed",
+    "CryptoSlate": "https://cryptoslate.com/feed/",
+    "Bitcoinist": "https://bitcoinist.com/feed/",
+    "NewsBTC": "https://www.newsbtc.com/feed/",
+    "CryptoNews": "https://cryptonews.com/news/feed/",
+    "The Defiant": "https://thedefiant.io/api/feed",
+    "CNBC Economy": "https://www.cnbc.com/id/20910258/device/rss/rss.html",
+    "CNBC Markets": "https://www.cnbc.com/id/10000664/device/rss/rss.html",
+    "MarketWatch": "https://feeds.content.dowjones.io/public/rss/mw_topstories",
 }
 
 
