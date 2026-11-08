@@ -15,6 +15,7 @@ const MAX_ITEMS = 3;
 
 const GN = 'https://news.google.com/rss/search?hl=en-US&gl=US&ceid=US:en&q=';
 const FEEDS = {
+  'CryptoPanic': 'https://cryptopanic.com/news/rss/',
   'Cointelegraph': 'https://cointelegraph.com/rss',
   'CoinDesk': 'https://www.coindesk.com/arc/outboundfeeds/rss/',
   'The Block': 'https://www.theblock.co/rss.xml',
