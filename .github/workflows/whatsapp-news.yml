@@ -1,8 +1,9 @@
 name: WhatsApp Breaking News
 
 on:
-  schedule:
-    - cron: '5 * * * *'   # every hour at :05 (free-minutes friendly while the repo is private)
+  workflow_run:            # runs right after "Hourly news", which is dispatched every hour on the hour
+    workflows: ["Hourly news"]
+    types: [completed]
   workflow_dispatch:
 
 permissions:
@@ -36,9 +37,16 @@ jobs:
         id: pick
         run: node src/alerts.js pick
 
+      - name: Cache node modules
+        if: steps.pick.outputs.found == 'true'
+        uses: actions/cache@v4
+        with:
+          path: whatsapp-report/node_modules
+          key: wa-node-${{ hashFiles('whatsapp-report/package.json') }}
+
       - name: Install
         if: steps.pick.outputs.found == 'true'
-        run: npm install --no-audit --no-fund
+        run: '[ -d node_modules ] || npm install --no-audit --no-fund'
 
       - name: Restore WhatsApp session
         if: steps.pick.outputs.found == 'true'
@@ -60,6 +68,6 @@ jobs:
           [ -f alerts-sent.json ] && git add alerts-sent.json
           if ! git diff --cached --quiet; then
             git commit -m "chore: WhatsApp alerts state [skip ci]"
-            git pull --rebase --autostash origin "${GITHUB_REF_NAME}" || true
+            git pull --rebase -X theirs --autostash origin "${GITHUB_REF_NAME}" || true
             git push
           fi
