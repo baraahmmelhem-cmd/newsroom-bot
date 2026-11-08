@@ -29,7 +29,7 @@ async function buildCard() {
   fs.writeFileSync(path.join(OUT, 'report.html'), html);
   const png = await renderPng(html, path.join(OUT, 'report.png'));
   const btc = data.crypto[0];
-  const caption = `التقرير الاقتصادي – ${arabicDate()}\n${news?.headline || (btc.price ? `BTC ${Math.round(btc.price).toLocaleString('en-US')}$ (${btc.change?.toFixed(1)}%)` : '')}`.trim();
+  const caption = `${process.env.REPORT_KIND === 'evening' ? 'الإغلاق المسائي' : 'التقرير الاقتصادي'} – ${arabicDate()}\n${news?.headline || (btc.price ? `BTC ${Math.round(btc.price).toLocaleString('en-US')}$ (${btc.change?.toFixed(1)}%)` : '')}`.trim();
   return { png, caption };
 }
 
