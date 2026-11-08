@@ -1,9 +1,9 @@
 name: WhatsApp Morning Report
 
 on:
-  schedule:
-    - cron: '50 3 * * *'  # ~08:00 Dubai (UTC+4) morning report
-    - cron: '50 16 * * *' # ~21:00 Dubai evening close
+  workflow_run:            # runs right after "Hourly news" (dispatched every hour); the job below only runs at 8:00 and 21:00 Dubai
+    workflows: ["Hourly news"]
+    types: [completed]
   workflow_dispatch:
     inputs:
       mode:
@@ -22,6 +22,7 @@ concurrency:
 
 jobs:
   report:
+    if: ${{ github.event_name != 'workflow_run' || contains(github.event.workflow_run.created_at, 'T04:') || contains(github.event.workflow_run.created_at, 'T17:') }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
@@ -29,7 +30,7 @@ jobs:
       SESSION_KEY: ${{ secrets.SESSION_KEY }}
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
       MODE: ${{ github.event.inputs.mode || 'send' }}
-      REPORT_KIND: ${{ (github.event.schedule == '50 16 * * *' || github.event.inputs.mode == 'evening') && 'evening' || 'morning' }}
+      REPORT_KIND: ${{ (contains(github.event.workflow_run.created_at, 'T17:') || github.event.inputs.mode == 'evening') && 'evening' || 'morning' }}
     defaults:
       run:
         working-directory: whatsapp-report
@@ -72,7 +73,7 @@ jobs:
             git add wa-session.enc
             if ! git diff --cached --quiet; then
               git commit -m "chore: update WhatsApp session [skip ci]"
-              git pull --rebase --autostash origin "${GITHUB_REF_NAME}" || true
+              git pull --rebase -X theirs --autostash origin "${GITHUB_REF_NAME}" || true
               git push
             fi
           fi
