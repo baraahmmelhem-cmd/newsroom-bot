@@ -2,7 +2,8 @@ name: WhatsApp Morning Report
 
 on:
   schedule:
-    - cron: '0 4 * * *'        # 07:00 Amman (UTC+3) every day
+    - cron: '50 2 * * *'  # ~07:00 Dubai (UTC+4) morning report
+    - cron: '45 16 * * *' # 20:45 Dubai evening close
   workflow_dispatch:
     inputs:
       mode:
@@ -10,7 +11,7 @@ on:
         required: true
         default: 'send'
         type: choice
-        options: [send, pair]
+        options: [send, evening, pair]
 
 permissions:
   contents: write
@@ -28,6 +29,7 @@ jobs:
       SESSION_KEY: ${{ secrets.SESSION_KEY }}
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
       MODE: ${{ github.event.inputs.mode || 'send' }}
+      REPORT_KIND: ${{ (github.event.schedule == '45 16 * * *' || github.event.inputs.mode == 'evening') && 'evening' || 'morning' }}
     defaults:
       run:
         working-directory: whatsapp-report
