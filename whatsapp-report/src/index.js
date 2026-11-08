@@ -30,7 +30,7 @@ async function buildCard() {
   const png = await renderPng(html, path.join(OUT, 'report.png'));
   const btc = data.crypto[0];
   const caption = `${process.env.REPORT_KIND === 'evening' ? 'الإغلاق المسائي' : 'التقرير الاقتصادي'} – ${arabicDate()}\n${news?.headline || (btc.price ? `BTC ${Math.round(btc.price).toLocaleString('en-US')}$ (${btc.change?.toFixed(1)}%)` : '')}`.trim();
-  return { png, caption };
+  return { png, caption, data };
 }
 
 (async () => {
@@ -42,8 +42,13 @@ async function buildCard() {
       const { png } = await buildCard();
       console.log('card written to', png);
     } else {
-      const { png, caption } = await buildCard();
+      const { png, caption, data } = await buildCard();
       await wa.sendToSelf({ imagePath: png, caption });
+      // Detailed text report right after the card (prices, crypto, US, UAE/Gulf, stocks).
+      try {
+        const text = await require('./detail').detailText(data, arabicDate());
+        if (text) await wa.sendToSelf({ text }); else console.warn('[detail] no text written');
+      } catch (e) { console.warn('[detail] failed:', e.message); }
     }
     console.log('done');
     process.exit(0);
