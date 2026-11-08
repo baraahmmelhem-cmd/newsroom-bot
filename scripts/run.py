@@ -16,7 +16,7 @@ import requests
 
 STATE = Path(__file__).resolve().parent.parent / "posted.json"
 LAST = Path(__file__).resolve().parent.parent / "last_post.txt"
-MIN_GAP_MIN = 15  # backup schedules skip if something was posted more recently
+MIN_GAP_MIN = 50  # backup schedules skip if something was posted more recently
 MODEL = os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-5-5")
 
 
@@ -57,6 +57,34 @@ FEEDS = {
 FRESH_HOURS = 2  # only headlines published in the last N hours are considered
 
 
+BANNED = ("israel", "israeli", "gaza", "netanyahu", "hamas", "hezbollah", "europe", "european", " eu ", "eu's", "ecb", "lagarde",
+          "eurozone", "brussels", "germany", "german ", "france", "italy", "spain", "britain", "british", "england",
+          "greece", "greek", "netherlands", "dutch", "poland", "switzerland", "swiss",
+          "إسرائيل", "اسرائيل", "الإسرائيلي", "غزة", "أوروب", "اوروب", "اليورو", "بريطانيا", "ألمانيا", "فرنسا", "اليونان")
+
+def banned(text):
+    """Hard filter (user rule): never anything about Europe or Israel."""
+    s = " " + (text or "").lower() + " "
+    return any(w in s for w in BANNED)
+
+URGENT_WORDS = ("الفيدرالي", "الفائدة", "التضخم", "الوظائف", "الناتج المحلي", "اختراق")
+
+def allow_urgent(item):
+    """'عاجل' is kept only for real breaking items: Fed/US data or a major hack."""
+    txt = item.get("title", "") + " " + item.get("body", "")
+    return bool(item.get("hot")) and any(w in txt for w in URGENT_WORDS)
+
+def minutes_since_last():
+    try:
+        return (time.time() - float(LAST.read_text().strip())) / 60
+    except Exception:
+        return 1e9
+
+MUST = False
+MUST_RULE = ("\nIMPORTANT: nothing has been published for about an hour. You MUST publish the strongest "
+             "story from the list (headlines up to 6 hours old are allowed now) that is not a repeat and "
+             "not about Europe or Israel. Reply skip ONLY if literally every candidate is a repeat.")
+
 def fetch_headlines():
     """Free public RSS feeds (no API key). Keeps ONLY fresh items, newest first, with their age."""
     import xml.etree.ElementTree as ET
@@ -78,7 +106,7 @@ def fetch_headlines():
                 except Exception:
                     continue  # no reliable date -> skip, we cannot prove it is fresh
                 age_min = (now - when).total_seconds() / 60
-                if t and 0 <= age_min <= FRESH_HOURS * 60:
+                if t and 0 <= age_min <= FRESH_HOURS * 60 and not banned(t):
                     items.append((age_min, f"- ({int(age_min)} min ago) {t} [{name}]"))
         except Exception as e:  # keep going with the other feeds
             print(f"Feed failed: {name}: {e}")
@@ -203,6 +231,8 @@ def write_item(headlines, posted, btc):
     """Uses Google Gemini (free tier) by default; set LLM=anthropic to use Claude instead (paid)."""
     prompt = PROMPT.format(headlines=headlines, btc=btc,
                            posted="\n".join(f"- {t}" for t in posted[-60:]) or "(none)")
+    if MUST:
+        prompt += MUST_RULE
     if env("LLM", required=False, default="gemini") == "anthropic":
         r = requests.post(
             "https://api.anthropic.com/v1/messages",
@@ -310,9 +340,13 @@ def recently_posted():
 
 
 def main():
+    global FRESH_HOURS, MUST
     if os.environ.get("GITHUB_EVENT_NAME") == "schedule" and recently_posted():
         print(f"Posted less than {MIN_GAP_MIN} min ago; skipping this run.")
         return
+    if minutes_since_last() >= 55:
+        FRESH_HOURS, MUST = 6, True
+        print("Over 55 min since the last post: widening to 6h, must publish.", flush=True)
     posted = load_state()
     headlines = fetch_headlines()
     if not headlines:
@@ -327,6 +361,15 @@ def main():
     if item.get("skip"):
         print("No new strong story; nothing published.")
         return
+    if banned(item.get("title", "") + " " + item.get("body", "")):
+        print("Skipped (Europe/Israel rule):", item.get("title"))
+        return
+    if not allow_urgent(item):
+        if item.get("category") == "عاجل":
+            txt = item.get("title", "") + item.get("body", "")
+            item["category"] = "كريبتو" if any(k in txt for k in ("بيتكوين", "كريبتو", "العملات", "إيثريوم", "ETF", "BTC", "ETH")) else "اقتصاد"
+        item["title"] = item.get("title", "").replace("عاجل:", "").replace("عاجل :", "").replace("  ", " ").strip()
+        item["hot"] = False
     dup = is_repeat(item.get("title", ""), posted)
     if dup:
         print("Skipped as repeat of:", dup)
