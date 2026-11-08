@@ -2,6 +2,7 @@
 // and renders it to PNG with Playwright/Chromium.
 
 const { chromium } = require('playwright');
+const EVE = process.env.REPORT_KIND === 'evening';
 
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const money = n => n == null ? '—' : Number(n).toLocaleString('en-US', n < 10 ? { minimumFractionDigits: 2, maximumFractionDigits: 2 } : { maximumFractionDigits: 0 });
@@ -23,7 +24,7 @@ function tick(a) {
 }
 
 function arabicDate(d = new Date()) {
-  return new Intl.DateTimeFormat('ar-EG-u-nu-latn', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Asia/Amman' }).format(d);
+  return new Intl.DateTimeFormat('ar-EG-u-nu-latn', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Asia/Dubai' }).format(d);
 }
 
 function fgLabel(v) {
@@ -39,7 +40,7 @@ function buildHtml(data, news) {
 
   const headline = news?.headline || (btc.change != null
     ? `البيتكوين ${btc.change < 0 ? 'يتراجع' : 'يرتفع'} ${Math.abs(btc.change).toFixed(1)}% خلال 24 ساعة، والقيمة السوقية للعملات المشفرة ${g.mcapChange == null ? '' : (g.mcapChange < 0 ? 'تنخفض ' : 'ترتفع ') + Math.abs(g.mcapChange).toFixed(1) + '%'}`
-    : 'موجز الأسواق الصباحي');
+    : (EVE ? 'حصاد الأسواق اليوم' : 'موجز الأسواق الصباحي'));
 
   const mcap = g.mcapUsd ? (g.mcapUsd / 1e12).toFixed(2) : null;
   const stats = news?.items?.length ? `
@@ -101,15 +102,15 @@ h1{font-family:'Amiri','Noto Naskh Arabic',serif;font-size:92px;font-weight:700;
 body.news h1{font-size:78px}body.news .sub{font-size:26px;padding-top:12px}body.news .tick{margin-top:30px}body.news .kick{padding-top:26px}
 </style></head><body class="${news?.items?.length ? 'news' : ''}">
 <div class="corner"></div>
-<div class="top"><div class="meta">${esc(arabicDate())}<br>الإصدار الصباحي · 7:00 بتوقيت عمّان</div><div class="brand">MR_AMWAL<small>MARKET INTELLIGENCE</small></div></div>
+<div class="top"><div class="meta">${esc(arabicDate())}<br>${EVE ? 'الإصدار المسائي · بتوقيت دبي' : 'الإصدار الصباحي · بتوقيت دبي'}</div><div class="brand">MR_AMWAL<small>MARKET INTELLIGENCE</small></div></div>
 <div class="rule"></div>
-<div class="kick">التقرير الاقتصادي اليومي</div>
-<h1>موجز الأسواق</h1>
+<div class="kick">${EVE ? 'الإغلاق المسائي' : 'التقرير الاقتصادي اليومي'}</div>
+<h1>${EVE ? 'حصاد اليوم' : 'موجز الأسواق'}</h1>
 <div class="sub">${esc(headline)}</div>
 <div class="tick">${assets.map(tick).join('')}</div>
 ${stats}
 ${items || '<div class="spacer"></div>'}
-<div class="foot"><b>ما نراقبه اليوم</b>${esc(watch)}<div class="disc">MR_AMWAL · الأسعار لحظة الإصدار من CoinGecko وYahoo Finance · تقرير معلوماتي وليس توصية استثمارية</div></div>
+<div class="foot"><b>${EVE ? 'ما نراقبه غدًا' : 'ما نراقبه اليوم'}</b>${esc(watch)}<div class="disc">MR_AMWAL · الأسعار لحظة الإصدار من CoinGecko وYahoo Finance · تقرير معلوماتي وليس توصية استثمارية</div></div>
 </body></html>`;
 }
 
