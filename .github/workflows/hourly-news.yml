@@ -1,7 +1,7 @@
 name: Hourly news
 on:
   schedule:
-    - cron: "20,50 * * * *"
+    - cron: "5,25,45 6,12,18 * * *"
   workflow_dispatch:
 concurrency:
   group: newsroom
