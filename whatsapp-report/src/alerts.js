@@ -11,7 +11,8 @@ const ROOT = path.join(__dirname, '..');
 const OUT = path.join(ROOT, 'out', 'alerts.json');
 const STATE = path.join(ROOT, 'alerts-sent.json');
 const FRESH_MIN = Number(process.env.ALERTS_FRESH_MIN || 75);
-const MAX_ITEMS = 3;
+const MAX_ITEMS = 1;          // one story per run
+const MAX_PER_DAY = 6;        // hard cap on WhatsApp alerts per 24h
 
 const GN = 'https://news.google.com/rss/search?hl=en-US&gl=US&ceid=US:en&q=';
 const FEEDS = {
@@ -113,14 +114,19 @@ function buildPrompt(headlines, sent) {
     'Already sent to the user (the SAME event is a repeat; only a genuinely new development counts as new):',
     done,
     '',
-    'TASK: pick ONLY stories that are truly important or breaking right now. At most 3. Zero is fine and common.',
+    'TASK: the user wants ONLY VERY STRONG, market-moving news. Pick AT MOST ONE story, and only if it would make',
+    'a professional trader stop and react right now. Zero is the normal answer; most runs should return nothing.',
+    'A story qualifies only if it has a clear decision, a hard number or a real shock (e.g. Fed rate decision,',
+    'CPI/jobs surprise, BTC/ETH move of 4%+ in hours, exchange hack of 50M$+, ETF flows of 500M$+ in a day,',
+    'a new US law/ruling on crypto, Trump tariff or crypto decision, a major US-China move).',
     'Topics allowed:',
     '- Crypto: big BTC/ETH/XRP moves, major hacks, exchange news (Binance etc.), ETF flows, regulation (SEC, CFTC, Congress).',
     '- USA: Fed decisions, key data (CPI, jobs, GDP, PCE), Congress or White House decisions that move markets.',
     '- Trump: statements or decisions that move markets (tariffs, crypto, the dollar, the Fed).',
     '- China: economy, tariffs, US-China relations, the yuan, crypto policy.',
     '- Market shocks: big moves in oil, gold, the dollar, stock market crashes.',
-    'Skip: opinion pieces, price predictions, small altcoins, memecoins, ads, minor company news, sports,',
+    'Skip: routine or weekly data (Fed balance sheet, weekly H.4.1, minor speeches), anything vague like "raises questions",',
+    'analysis, opinion pieces, price predictions, small altcoins, memecoins, ads, minor company news, sports,',
     'and NEVER anything about Europe (ECB, EU, European countries or companies) or Israel.',
     'FACTS: use only facts present in the headlines. Never invent numbers, names or quotes.',
     'WRITE in Modern Standard Arabic, like a phone push notification:',
@@ -163,6 +169,13 @@ async function askGemini(prompt) {
 async function pick() {
   const sent = loadState();
   const now = Date.now();
+  const today = sent.filter(s => now - (s.ts || 0) < 24 * 3600 * 1000).length;
+  if (today >= MAX_PER_DAY) {
+    console.log('[alerts] daily cap reached (' + today + ' in 24h); sending nothing.');
+    fs.mkdirSync(path.dirname(OUT), { recursive: true });
+    fs.writeFileSync(OUT, '[]');
+    return setOutput(false);
+  }
   const names = Object.keys(FEEDS);
   const results = await Promise.allSettled(names.map(n => fetchFeed(n, FEEDS[n])));
   let items = [];
