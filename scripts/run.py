@@ -81,8 +81,9 @@ def minutes_since_last():
         return 1e9
 
 MUST = False
-MUST_RULE = ("\nIMPORTANT: nothing has been published for about an hour. You MUST publish the strongest "
-             "story from the list (headlines up to 6 hours old are allowed now) that is not a repeat and "
+SLOT_HOURS = (9, 15, 21)  # Amman time: 3 items a day
+MUST_RULE = ("\nIMPORTANT: this is one of the 3 daily slots. You MUST publish the strongest "
+             "story from the list (headlines up to 8 hours old are allowed now) that is not a repeat and "
              "not about Europe or Israel. Reply skip ONLY if literally every candidate is a repeat.")
 
 def fetch_headlines():
@@ -199,26 +200,29 @@ level, post that rise as the story right away. CONSISTENCY: look at the "Already
 never publish a story that contradicts the current BTC direction in the headlines (do not write
 "BTC falls/drops" when the latest headlines show it rising, and vice versa). If an older published
 item is now outdated, write the new development as an update ("يرتد", "يتعافى") instead.
-ONLY topics about the USA, China, Trump, or crypto/markets. NEVER pick anything about Europe
+ONLY CRYPTO stories (Bitcoin and major coins, ETFs, exchanges, regulation of crypto, hacks, big institutional moves); a US/Fed/China/Trump story only if it is directly about crypto. NEVER pick anything about Europe
 (ECB, Lagarde, EU, eurozone, European countries or companies) or Israel; skip those entirely.
 
 FACTS: use ONLY facts present in the headlines above. Never invent numbers, names or quotes.
 If a detail is not in the headlines, leave it out.
 
-WRITING (Modern Standard Arabic, natural news style, correct grammar):
-- Style: like a phone news push notification: a punchy headline, then ONE short sentence.
-- title: max 10 words, starts with one fitting emoji (🚨 breaking, 📉/📈 price moves, 🏦 regulation
-  or central banks, 🔐 hacks, 💵 US economy data, 🇨🇳 China); for truly breaking news put
-  "عاجل:" right after the emoji. The headline alone must tell the story. No quotes.
-- body: ONE short sentence only (max 25 words) with the key figure or detail. NO
-  "ماذا يعني للمتداول" line, NO price line, NO source line, no buy/sell advice, no hashtags.
-  Write company/coin names as usual (BTC, ETH, XRP, Fed written "الفيدرالي").
-- category: "عاجل" is RARE (at most 1-2 per day): only a Fed decision, a major US data release,
-  a major exchange hack or a market shock. Normal news is "كريبتو" for crypto or "اقتصاد" for
-  macro; "تنبيه" for security/risk warnings. Do not put "عاجل:" in the title of normal news.
+WRITING (Modern Standard Arabic, clear and well ordered; the user publishes only 3 items a day,
+so each one must be one of the 3 most important CRYPTO stories of the day):
+- title: one clear Arabic headline, max 12 words, that tells the story and includes the key number.
+  No emoji. No quotes.
+- body: plain text with line breaks as real new lines, in this exact order:
+  1) One Arabic lead sentence (max 35 words) with the key numbers: what happened.
+  2) An empty line, then two short Arabic bullet points, each starting with "• ".
+  3) An empty line, then one Arabic sentence of context: why it matters for the market.
+  4) An empty line, then a short English headline on its own line, then one English sentence.
+  5) An empty line, then "المصدر: " followed by the outlet names from the headlines, separated by " · ".
+- ARABIC TEXT DIRECTION RULE (very important): every Arabic line must START with an Arabic word,
+  never with an English word, a ticker, a number or a symbol. Write coin and company names in Arabic
+  (بيتكوين، إيثريوم، ريبل، سولانا، بلاك روك، الفيدرالي). Put numbers in the middle of the sentence.
+- Correct Arabic grammar, no slang, no buy/sell advice, no hashtags, no emoji.
+- category: always "كريبتو".
 - REPEATS: a story about the same company/figure/event as ANY item in the published list is a
-  repeat even if worded differently (e.g. the same Tether 150k BTC or CFTC perpetual-futures
-  story). Never publish the same event twice.
+  repeat even if worded differently. Never publish the same event twice.
 
 Reply with JSON only, no markdown fences:
 {{"skip": false, "title": "...", "body": "...", "category": "كريبتو|اقتصاد|عاجل|تنبيه", "hot": false}}
@@ -344,9 +348,16 @@ def main():
     if os.environ.get("GITHUB_EVENT_NAME") == "schedule" and recently_posted():
         print(f"Posted less than {MIN_GAP_MIN} min ago; skipping this run.")
         return
-    if minutes_since_last() >= 55:
-        FRESH_HOURS, MUST = 6, True
-        print("Over 55 min since the last post: widening to 6h, must publish.", flush=True)
+    from datetime import datetime, timezone, timedelta
+    amman_hour = (datetime.now(timezone.utc) + timedelta(hours=3)).hour
+    if amman_hour not in SLOT_HOURS:
+        print("Outside the 3 daily slots (9:00, 15:00, 21:00 Amman); nothing to do.")
+        return
+    if minutes_since_last() < 240:
+        print("Already published in this slot; skipping.")
+        return
+    FRESH_HOURS, MUST = 8, True
+    print("Daily slot", amman_hour, ": publishing the strongest crypto story of the last 8h.", flush=True)
     posted = load_state()
     headlines = fetch_headlines()
     if not headlines:
