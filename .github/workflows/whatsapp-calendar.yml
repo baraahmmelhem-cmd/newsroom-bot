@@ -1,0 +1,69 @@
+name: WhatsApp Economic Calendar
+
+on:
+  schedule:
+    - cron: '15 5 * * *' # 08:15 Amman (UTC+3) every day; Mondays also include the whole week
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: whatsapp-report # never use the WhatsApp session at the same time as the other WhatsApp jobs
+  cancel-in-progress: false
+
+jobs:
+  calendar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      WHATSAPP_PHONE: ${{ secrets.WHATSAPP_PHONE }}
+      SESSION_KEY: ${{ secrets.SESSION_KEY }}
+      PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+    defaults:
+      run:
+        working-directory: whatsapp-report
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Build today's and tomorrow's US calendar
+        id: pick
+        run: node src/calendar.js pick
+
+      - name: Cache node modules
+        if: steps.pick.outputs.found == 'true'
+        uses: actions/cache@v4
+        with:
+          path: whatsapp-report/node_modules
+          key: wa-node-${{ hashFiles('whatsapp-report/package.json') }}
+
+      - name: Install
+        if: steps.pick.outputs.found == 'true'
+        run: '[ -d node_modules ] || npm install --no-audit --no-fund'
+
+      - name: Restore WhatsApp session
+        if: steps.pick.outputs.found == 'true'
+        run: openssl enc -d -aes-256-cbc -pbkdf2 -pass env:SESSION_KEY -in wa-session.enc | tar xz
+
+      - name: Send to WhatsApp
+        if: steps.pick.outputs.found == 'true'
+        run: node src/calendar.js send
+
+      - name: Save session
+        if: always() && steps.pick.outputs.found == 'true'
+        run: |
+          if [ -d wa-session ] && [ -f wa-session/creds.json ]; then
+            tar cz wa-session | openssl enc -aes-256-cbc -pbkdf2 -salt -pass env:SESSION_KEY -out wa-session.enc
+          fi
+          git config user.name "whatsapp-calendar-bot"
+          git config user.email "bot@users.noreply.github.com"
+          git add wa-session.enc
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: WhatsApp session [skip ci]"
+            git pull --rebase -X theirs --autostash origin "${GITHUB_REF_NAME}" || true
+            git push
+          fi
