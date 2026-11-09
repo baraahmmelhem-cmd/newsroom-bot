@@ -110,13 +110,24 @@ async function loadEvents() {
     .filter(e => { const k = e.title + e.date; if (seen.has(k)) return false; seen.add(k); return true; });
 }
 
-function line(e, withDay) {
-  const nums = [];
-  if (e.forecast) nums.push('التوقع ' + e.forecast);
-  if (e.previous) nums.push('السابق ' + e.previous);
-  const when = (withDay ? dateAr(e.d) + '، ' : '') + 'الساعة ' + timeAr(e.d);
-  return '• ' + arabicName(e.title) + ' — ' + when + (nums.length ? ' (' + nums.join('، ') + ')' : '');
+function num(v) {
+  // 225K -> 225 ألف, 1.2M -> 1.2 مليون, 3B -> 3 مليار
+  return String(v).replace(/^(-?[\d.,]+)K$/i, '$1 ألف').replace(/^(-?[\d.,]+)M$/i, '$1 مليون').replace(/^(-?[\d.,]+)B$/i, '$1 مليار');
 }
+
+function block(e) {
+  // One event as a tidy block; every line starts with an Arabic word so WhatsApp keeps it right-to-left.
+  const out = ['▪️ *' + arabicName(e.title) + '*', '   الموعد: الساعة ' + timeAr(e.d)];
+  if (e.forecast) out.push('   التوقع: ' + num(e.forecast));
+  if (e.previous) out.push('   القراءة السابقة: ' + num(e.previous));
+  return out.join('\n');
+}
+
+function dayList(list, emptyText) {
+  return list.length ? list.map(block).join('\n\n') : 'لا توجد بيانات أمريكية مؤثرة ' + emptyText + '.';
+}
+
+const FOOTER = '\n\n_جميع المواعيد بتوقيت عمّان._';
 
 function buildMessages(events, now) {
   const msgs = [];
@@ -126,23 +137,34 @@ function buildMessages(events, now) {
   const today = events.filter(e => dayKey(e.d) === todayKey);
   const tmr = events.filter(e => dayKey(e.d) === tomorrowKey);
 
-  // Monday (Amman): the whole week, Monday to Friday
+  // Monday (Amman): the whole week, grouped by day
   if (amman(now).getUTCDay() === 1) {
+    const endDay = new Date(now.getTime() + 4 * 24 * 3600 * 1000);
     const end = now.getTime() + 6 * 24 * 3600 * 1000;
     const week = events.filter(e => e.d.getTime() >= now.getTime() - 12 * 3600 * 1000 && e.d.getTime() <= end);
+    const days = [];
+    for (const e of week) {
+      const k = dayKey(e.d);
+      let g = days.find(x => x.k === k);
+      if (!g) { g = { k, d: e.d, list: [] }; days.push(g); }
+      g.list.push(e);
+    }
+    const body = days.length
+      ? days.map(g => '📌 *' + dateAr(g.d) + '*\n' + g.list.map(block).join('\n\n')).join('\n\n────────\n\n')
+      : 'لا توجد بيانات أمريكية مؤثرة هذا الأسبوع.';
     msgs.push(
-      '*أهم القرارات والبيانات الأمريكية هذا الأسبوع*\n' +
-      (week.length ? week.map(e => line(e, true)).join('\n') : 'لا توجد بيانات أمريكية عالية التأثير هذا الأسبوع.') +
-      '\n\nالأوقات بتوقيت عمّان.'
+      '🗓️ *أجندة الأسبوع الاقتصادية الأمريكية*\n' +
+      'من ' + dateAr(now) + ' إلى ' + dateAr(endDay) + '\n\n' +
+      body + FOOTER
     );
   }
 
   msgs.push(
-    '*قرارات اليوم – ' + dateAr(now) + '*\n' +
-    (today.length ? today.map(e => line(e, false)).join('\n') : 'لا توجد بيانات أمريكية مهمة اليوم.') +
-    '\n\n*قرارات بكرا – ' + dateAr(tomorrow) + '*\n' +
-    (tmr.length ? tmr.map(e => line(e, false)).join('\n') : 'لا توجد بيانات أمريكية مهمة بكرا.') +
-    '\n\nالأوقات بتوقيت عمّان.'
+    '📅 *الأجندة الاقتصادية الأمريكية*\n\n' +
+    '🔹 *اليوم – ' + dateAr(now) + '*\n' + dayList(today, 'اليوم') +
+    '\n\n────────\n\n' +
+    '🔸 *غدًا – ' + dateAr(tomorrow) + '*\n' + dayList(tmr, 'غدًا') +
+    FOOTER
   );
   return msgs;
 }
