@@ -11,8 +11,8 @@ const ROOT = path.join(__dirname, '..');
 const OUT = path.join(ROOT, 'out', 'alerts.json');
 const STATE = path.join(ROOT, 'alerts-sent.json');
 const FRESH_MIN = Number(process.env.ALERTS_FRESH_MIN || 75);
-const MAX_ITEMS = 1;          // one story per run
-const MAX_PER_DAY = 6;        // hard cap on WhatsApp alerts per 24h
+const MAX_ITEMS = 3;          // up to 3 strong stories per run
+const MAX_PER_DAY = 100000;   // no daily cap (user: quantity does not matter, only strength)
 
 const GN = 'https://news.google.com/rss/search?hl=en-US&gl=US&ceid=US:en&q=';
 const FEEDS = {
@@ -114,12 +114,15 @@ function buildPrompt(headlines, sent) {
     'Already sent to the user (the SAME event is a repeat; only a genuinely new development counts as new):',
     done,
     '',
-    'TASK: the user wants ONLY VERY STRONG, market-moving news. Pick AT MOST ONE story, and only if it would make',
-    'a professional trader stop and react right now. Zero is the normal answer; most runs should return nothing.',
-    'A story qualifies only if it has a clear decision, a hard number or a real shock (e.g. Fed rate decision,',
-    'CPI/jobs surprise, BTC/ETH move of 4%+ in hours, exchange hack of 50M$+, ETF flows of 500M$+ in a day,',
-    'a new US law/ruling on crypto, Trump tariff or crypto decision, a major US-China move).',
-    'Topics allowed:',
+    'TASK: the user wants STRONG, important news only; the number of messages does not matter. Send every story',
+    'that is genuinely important right now (up to 3 per run). Zero is fine when nothing strong happened.',
+    'ALWAYS send these immediately when they appear in the headlines:',
+    '- Any notable Bitcoin price move: Bitcoin rising or falling sharply, breaking or losing a key level, a new',
+    '  high or low, big liquidations. Write the direction and the price/percent from the headline.',
+    '- Fed / US interest-rate decisions, Powell remarks, CPI, jobs, GDP, PCE and other key US data.',
+    '- Trump statements or decisions that can move markets (tariffs, crypto, the dollar, the Fed, China).',
+    '- Sudden breaking news: exchange hacks or collapses, big ETF flows, new US crypto laws or rulings.',
+'Topics allowed:',
     '- Crypto: big BTC/ETH/XRP moves, major hacks, exchange news (Binance etc.), ETF flows, regulation (SEC, CFTC, Congress).',
     '- USA: Fed decisions, key data (CPI, jobs, GDP, PCE), Congress or White House decisions that move markets.',
     '- Trump: statements or decisions that move markets (tariffs, crypto, the dollar, the Fed).',
