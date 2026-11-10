@@ -363,7 +363,8 @@ def main():
         return
     from datetime import datetime, timezone, timedelta
     amman_hour = (datetime.now(timezone.utc) + timedelta(hours=3)).hour
-    if amman_hour not in SLOT_HOURS:
+    # The slot hour, plus one catch-up hour if the slot run published nothing (the 4h guard below stops doubles).
+    if amman_hour not in SLOT_HOURS and (amman_hour - 1) not in SLOT_HOURS:
         print("Outside the 3 daily slots (9:00, 15:00, 21:00 Amman); nothing to do.")
         return
     if minutes_since_last() < 240:
@@ -382,6 +383,11 @@ def main():
         return
     print(btc, flush=True)
     item = write_item(headlines, posted, btc)
+    if item.get("skip"):
+        print("Model skipped in a daily slot; asking once more.", flush=True)
+        import time
+        time.sleep(8)
+        item = write_item(headlines, posted, btc)
     if item.get("skip"):
         print("No new strong story; nothing published.")
         return
