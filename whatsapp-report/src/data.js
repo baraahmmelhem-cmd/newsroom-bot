@@ -50,8 +50,10 @@ async function fearGreed() {
 }
 
 // --- Gold & Brent: Yahoo Finance chart endpoint (free, no key) -------------
-async function yahoo(symbol) {
-  const u = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=5d&interval=1d`;
+const STOOQ = { 'GC=F': 'xauusd', 'BZ=F': 'cb.f' };
+
+async function yahooOnce(host, symbol) {
+  const u = `https://${host}/v8/finance/chart/${encodeURIComponent(symbol)}?range=5d&interval=1d`;
   const d = await getJSON(u);
   const m = d.chart?.result?.[0]?.meta;
   if (!m?.regularMarketPrice) throw new Error('no price');
@@ -59,6 +61,27 @@ async function yahoo(symbol) {
   const change = prev ? ((m.regularMarketPrice / prev) - 1) * 100 : null;
   const closes = (d.chart.result[0].indicators?.quote?.[0]?.close || []).filter(x => x != null);
   return { price: m.regularMarketPrice, change, spark: closes };
+}
+
+// Stooq daily CSV (free, no key): backup when Yahoo rate-limits (HTTP 429).
+async function stooq(symbol) {
+  const s = STOOQ[symbol];
+  if (!s) throw new Error('no stooq symbol');
+  const r = await fetch(`https://stooq.com/q/d/l/?s=${s}&i=d`, { headers: UA });
+  if (!r.ok) throw new Error('stooq ' + r.status);
+  const rows = (await r.text()).trim().split('\n').slice(1).map(l => l.split(',')).filter(c => c.length >= 5 && !isNaN(parseFloat(c[4])));
+  const closes = rows.slice(-6).map(c => parseFloat(c[4]));
+  if (closes.length < 2) throw new Error('stooq: no data');
+  const price = closes[closes.length - 1], prev = closes[closes.length - 2];
+  return { price, change: ((price / prev) - 1) * 100, spark: closes.slice(-5) };
+}
+
+async function yahoo(symbol) {
+  for (const host of ['query1.finance.yahoo.com', 'query2.finance.yahoo.com']) {
+    try { return await yahooOnce(host, symbol); }
+    catch (e) { console.warn(`[data] ${symbol} via ${host}: ${e.message}`); await new Promise(r => setTimeout(r, 1500)); }
+  }
+  return await stooq(symbol);
 }
 
 // --- News headlines (English RSS) for the optional AI summary ---------------
