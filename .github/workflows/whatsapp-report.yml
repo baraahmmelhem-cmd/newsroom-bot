@@ -54,7 +54,9 @@ jobs:
 
       - name: Restore WhatsApp session
         run: |
-          if [ -f wa-session.enc ]; then
+          if [ "$MODE" = "pair" ]; then
+            echo "pair mode: starting a fresh link (old session ignored)"
+          elif [ -f wa-session.enc ]; then
             if [ -z "$SESSION_KEY" ]; then echo "SESSION_KEY secret missing"; exit 1; fi
             openssl enc -d -aes-256-cbc -pbkdf2 -pass env:SESSION_KEY -in wa-session.enc | tar xz
             echo "session restored"
