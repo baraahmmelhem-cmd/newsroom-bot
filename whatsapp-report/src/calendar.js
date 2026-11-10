@@ -14,7 +14,7 @@ const FEEDS = [
   'https://nfs.faireconomy.media/ff_calendar_thisweek.json',
   'https://nfs.faireconomy.media/ff_calendar_nextweek.json',
 ];
-const AMMAN_OFFSET_H = 3; // Asia/Amman is UTC+3 all year
+const AMMAN_OFFSET_H = 4; // times are shown in Dubai time (UTC+4 all year)
 
 const DAYS = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
 const MONTHS = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
@@ -127,7 +127,7 @@ function dayList(list, emptyText) {
   return list.length ? list.map(block).join('\n\n') : 'لا توجد بيانات أمريكية مؤثرة ' + emptyText + '.';
 }
 
-const FOOTER = '\n\n_جميع المواعيد بتوقيت عمّان._';
+const FOOTER = '\n\n_جميع المواعيد بتوقيت دبي._';
 
 function buildMessages(events, now) {
   const msgs = [];
