@@ -3,7 +3,7 @@
 // It may only use facts present in the headlines; it must not invent numbers.
 
 const EVE = process.env.REPORT_KIND === 'evening';
-const MODELS = ['gemini-2.5-flash', 'gemini-2.0-flash'];
+const MODELS = ['gemini-flash-latest', 'gemini-flash-lite-latest', 'gemini-2.5-flash'];
 
 function fmt(n) { return n == null ? '—' : Number(n).toLocaleString('en-US', { maximumFractionDigits: n < 10 ? 2 : 0 }); }
 
