@@ -23,7 +23,14 @@ jobs:
           NEWSROOM_KEY: ${{ secrets.NEWSROOM_KEY }}
           NEWSROOM_SESSION: ${{ secrets.NEWSROOM_SESSION }}
         run: python scripts/run.py
+      - name: Pinned story (renewed every 3 days)
+        if: always()
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          NEWSROOM_SESSION: ${{ secrets.NEWSROOM_SESSION }}
+        run: python scripts/pinned.py || true
       - name: Save state
+        if: always()
         run: |
           git config user.name "newsroom-bot"
           git config user.email "bot@users.noreply.github.com"
