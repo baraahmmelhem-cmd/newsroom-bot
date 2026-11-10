@@ -144,7 +144,17 @@ function buildPrompt(headlines, sent) {
 async function askGemini(prompt) {
   const key = process.env.GEMINI_API_KEY;
   if (!key) throw new Error('GEMINI_API_KEY secret is missing');
-  const models = ['gemini-flash-latest', 'gemini-2.5-flash', 'gemini-flash-lite-latest', 'gemini-2.0-flash'];
+  // Ask Google which models this key can use, so a retired model name never breaks the alerts.
+  let models = ['gemini-flash-latest', 'gemini-flash-lite-latest'];
+  try {
+    const lm = await (await fetch('https://generativelanguage.googleapis.com/v1beta/models?pageSize=200&key=' + key, { signal: AbortSignal.timeout(20000) })).json();
+    const names = (lm.models || [])
+      .filter(m => (m.supportedGenerationMethods || []).includes('generateContent'))
+      .map(m => m.name.split('/').pop())
+      .filter(n => /flash/.test(n) && !/image|tts|live|audio|embedding|exp/.test(n));
+    models = [...new Set([...models, ...names])].slice(0, 6);
+  } catch (e) { console.log('[alerts] model list failed', e.message); }
+  models = [...models, ...models.slice(0, 2)]; // busy (503) models get a second try after a pause
   let last;
   for (const model of models) {
     try {
@@ -163,7 +173,7 @@ async function askGemini(prompt) {
     } catch (e) {
       last = model + ': ' + e.message;
       console.log('[alerts] model failed', last);
-      await new Promise(r => setTimeout(r, 2000));
+      await new Promise(r => setTimeout(r, 6000));
     }
   }
   throw new Error('No Gemini model worked (' + last + ')');
