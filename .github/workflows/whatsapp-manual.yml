@@ -1,0 +1,60 @@
+name: WhatsApp Manual Message
+
+on:
+  workflow_dispatch:
+    inputs:
+      text:
+        description: 'Message to send to your own WhatsApp chat'
+        required: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: whatsapp-report
+  cancel-in-progress: false
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      WHATSAPP_PHONE: ${{ secrets.WHATSAPP_PHONE }}
+      SESSION_KEY: ${{ secrets.SESSION_KEY }}
+      MSG: ${{ github.event.inputs.text }}
+      PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+    defaults:
+      run:
+        working-directory: whatsapp-report
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Cache node modules
+        uses: actions/cache@v4
+        with:
+          path: whatsapp-report/node_modules
+          key: wa-node-${{ hashFiles('whatsapp-report/package.json') }}
+      - name: Install
+        run: '[ -d node_modules ] || npm install --no-audit --no-fund'
+      - name: Restore WhatsApp session
+        run: openssl enc -d -aes-256-cbc -pbkdf2 -pass env:SESSION_KEY -in wa-session.enc | tar xz
+      - name: Send
+        run: node -e "require('./src/send').sendToSelf({ text: process.env.MSG.split(String.fromCharCode(92) + 'n').join(String.fromCharCode(10)) }).then(() => process.exit(0)).catch(e => { console.error(e.message); process.exit(1); })"
+      - name: Save session
+        if: always()
+        run: |
+          if [ -d wa-session ] && [ -f wa-session/creds.json ]; then
+            tar cz wa-session | openssl enc -aes-256-cbc -pbkdf2 -salt -pass env:SESSION_KEY -out wa-session.enc
+          fi
+          git config user.name "whatsapp-manual-bot"
+          git config user.email "bot@users.noreply.github.com"
+          git add wa-session.enc
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: WhatsApp session [skip ci]"
+            git pull --rebase -X theirs --autostash origin main || true
+            git push
+          fi
