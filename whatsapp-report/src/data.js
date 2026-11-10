@@ -76,12 +76,38 @@ async function stooq(symbol) {
   return { price, change: ((price / prev) - 1) * 100, spark: closes.slice(-5) };
 }
 
+// CNBC quote service (free, no key): main backup for gold and Brent.
+const CNBC = { 'GC=F': '@GC.1', 'BZ=F': '@LCO.1' };
+async function cnbc(symbol) {
+  const s = CNBC[symbol];
+  if (!s) throw new Error('no cnbc symbol');
+  const u = 'https://quote.cnbc.com/quote-html-webservice/restQuote/symbolType/symbol?symbols=' + encodeURIComponent(s) + '&requestMethod=itv&noform=1&partnerId=2&fund=1&exthrs=1&output=json';
+  const d = await getJSON(u);
+  const q = [].concat(d?.FormattedQuoteResult?.FormattedQuote || [])[0];
+  const price = q ? parseFloat(String(q.last).replace(/,/g, '')) : NaN;
+  if (!isFinite(price)) throw new Error('cnbc: no price');
+  const change = q.change_pct != null ? parseFloat(String(q.change_pct).replace(/[%+,]/g, '')) : null;
+  const prev = isFinite(change) ? price / (1 + change / 100) : price;
+  return { price, change: isFinite(change) ? change : null, spark: [prev, price] };
+}
+
+// gold-api.com (free, no key): last resort for gold price only.
+async function goldApi() {
+  const d = await getJSON('https://api.gold-api.com/price/XAU');
+  if (!isFinite(d?.price)) throw new Error('gold-api: no price');
+  return { price: d.price, change: null, spark: [d.price, d.price] };
+}
+
 async function yahoo(symbol) {
   for (const host of ['query1.finance.yahoo.com', 'query2.finance.yahoo.com']) {
     try { return await yahooOnce(host, symbol); }
     catch (e) { console.warn(`[data] ${symbol} via ${host}: ${e.message}`); await new Promise(r => setTimeout(r, 1500)); }
   }
-  return await stooq(symbol);
+  for (const fn of [() => cnbc(symbol), () => stooq(symbol), () => (symbol === 'GC=F' ? goldApi() : Promise.reject(new Error('no more sources')))]) {
+    try { return await fn(); }
+    catch (e) { console.warn(`[data] ${symbol} backup: ${e.message}`); }
+  }
+  throw new Error('all sources failed');
 }
 
 // --- News headlines (English RSS) for the optional AI summary ---------------
