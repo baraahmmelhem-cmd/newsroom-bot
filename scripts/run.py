@@ -100,6 +100,8 @@ def fetch_headlines():
             root = ET.fromstring(r.content)
             for i in root.iter("item"):
                 t = (i.findtext("title") or "").strip()
+                import re as _re
+                d = " ".join(_re.sub(r"<[^>]+>", " ", i.findtext("description") or "").split())[:300]
                 try:
                     when = parsedate_to_datetime(i.findtext("pubDate") or "")
                     if when.tzinfo is None:
@@ -108,7 +110,7 @@ def fetch_headlines():
                     continue  # no reliable date -> skip, we cannot prove it is fresh
                 age_min = (now - when).total_seconds() / 60
                 if t and 0 <= age_min <= FRESH_HOURS * 60 and not banned(t):
-                    items.append((age_min, f"- ({int(age_min)} min ago) {t} [{name}]"))
+                    items.append((age_min, f"- ({int(age_min)} min ago) {t}{(' — ' + d) if d else ''} [{name}]"))
         except Exception as e:  # keep going with the other feeds
             print(f"Feed failed: {name}: {e}")
     items.sort()
@@ -188,6 +190,11 @@ Already published on the site (the SAME event or the same topic, e.g. another Fe
 item, is a REPEAT; only a genuinely new development counts as new):
 {posted}
 
+STRENGTH TEST: before choosing, rank the candidates by how much they move the crypto market TODAY.
+Strong: BTC/ETH price moves, spot ETF flows, US data/Fed, major regulation or court decisions, hacks,
+buys/sells over 500 million dollars by big players. Weak (choose only if nothing strong exists):
+bank pilots, partnerships, product launches, licences, conference talk, single-company news without
+market impact.
 TASK: choose the single STRONGEST high-impact story that is NOT a repeat. Priority: big BTC/ETH
 moves, Fed/rates/inflation data, spot ETF flows, major regulation or court rulings, large
 institutional moves, major hacks, oil/gold/dollar moves, US-China. Skip small altcoins,
@@ -203,17 +210,23 @@ item is now outdated, write the new development as an update ("يرتد", "يت�
 ONLY CRYPTO stories (Bitcoin and major coins, ETFs, exchanges, regulation of crypto, hacks, big institutional moves); a US/Fed/China/Trump story only if it is directly about crypto. NEVER pick anything about Europe
 (ECB, Lagarde, EU, eurozone, European countries or companies) or Israel; skip those entirely.
 
-FACTS: use ONLY facts present in the headlines above. Never invent numbers, names or quotes.
+FACTS: use ONLY facts present in the headlines and their summaries above (the text after " — "). Never invent numbers, names or quotes.
 If a detail is not in the headlines, leave it out.
 
 WRITING (Modern Standard Arabic, clear and well ordered; the user publishes only 3 items a day,
 so each one must be one of the 3 most important CRYPTO stories of the day):
-- title: one clear Arabic headline, max 12 words, that tells the story and includes the key number.
+- title: one clear, grammatical Arabic headline, max 12 words, that tells the story and includes the key
+  number. Start with who did what (e.g. "شركة التعدين مارا تبيع ..."). Never translate English words
+  literally into odd Arabic (wrong: "معدن تكتل مارا"); write it as an Arab financial journalist would.
   No emoji. No quotes.
 - body: plain text with line breaks as real new lines, in this exact order:
   1) One Arabic lead sentence (max 35 words) with the key numbers: what happened.
-  2) An empty line, then two short Arabic bullet points, each starting with "• ".
-  3) An empty line, then one Arabic sentence of context: why it matters for the market.
+  2) An empty line, then two short Arabic bullet points, each starting with "• ". EACH bullet must add a
+     NEW concrete fact that is NOT in the title or the lead (another number, a percentage, a comparison,
+     who else is involved, what happens next). Never restate the lead in other words. If the headlines
+     and summaries do not give enough facts for two new bullets, pick a different story.
+  3) An empty line, then one Arabic sentence of context that links the story to the market today and
+     uses the LIVE MARKET line (e.g. the Bitcoin price and its 24h change). No vague filler.
   4) An empty line, then a short English headline on its own line, then one English sentence.
   5) An empty line, then "المصدر: " followed by the outlet names from the headlines, separated by " · ".
 - ARABIC TEXT DIRECTION RULE (very important): every Arabic line must START with an Arabic word,
