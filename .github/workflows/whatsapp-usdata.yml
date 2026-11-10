@@ -1,0 +1,75 @@
+name: US Data Watch
+
+on:
+  workflow_run:            # every hour, right after "Hourly news"
+    workflows: ["Hourly news"]
+    types: [completed]
+  workflow_dispatch:       # can also be started by a timer at release time
+
+permissions:
+  contents: write
+
+concurrency:
+  group: whatsapp-report   # never use the WhatsApp session at the same time as the other WhatsApp jobs
+  cancel-in-progress: false
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      WHATSAPP_PHONE: ${{ secrets.WHATSAPP_PHONE }}
+      SESSION_KEY: ${{ secrets.SESSION_KEY }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      NEWSROOM_SESSION: ${{ secrets.NEWSROOM_SESSION }}
+      PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+    defaults:
+      run:
+        working-directory: whatsapp-report
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main   # newest WhatsApp session and state, even if this run waited in the queue
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Reminders and results of US data
+        id: pick
+        run: node src/usdata.js pick
+
+      - name: Cache node modules
+        if: steps.pick.outputs.found == 'true'
+        uses: actions/cache@v4
+        with:
+          path: whatsapp-report/node_modules
+          key: wa-node-${{ hashFiles('whatsapp-report/package.json') }}
+
+      - name: Install
+        if: steps.pick.outputs.found == 'true'
+        run: '[ -d node_modules ] || npm install --no-audit --no-fund'
+
+      - name: Restore WhatsApp session
+        if: steps.pick.outputs.found == 'true'
+        run: openssl enc -d -aes-256-cbc -pbkdf2 -pass env:SESSION_KEY -in wa-session.enc | tar xz
+
+      - name: Send to WhatsApp
+        if: steps.pick.outputs.found == 'true'
+        run: node src/usdata.js send
+
+      - name: Save session and state
+        if: always()
+        run: |
+          if [ -d wa-session ] && [ -f wa-session/creds.json ]; then
+            tar cz wa-session | openssl enc -aes-256-cbc -pbkdf2 -salt -pass env:SESSION_KEY -out wa-session.enc
+            git add wa-session.enc
+          fi
+          git config user.name "us-data-bot"
+          git config user.email "bot@users.noreply.github.com"
+          [ -f usdata-state.json ] && git add usdata-state.json
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: US data state [skip ci]"
+            git pull --rebase -X theirs --autostash origin main || true
+            git push
+          fi
