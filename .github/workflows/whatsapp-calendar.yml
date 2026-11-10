@@ -1,8 +1,11 @@
 name: WhatsApp Economic Calendar
 
 on:
+  workflow_run:            # right after "Hourly news" (dispatched every hour); the job runs only on the 8:00 Amman one
+    workflows: ["Hourly news"]
+    types: [completed]
   schedule:
-    - cron: '15 5 * * *' # 08:15 Amman (UTC+3) every day; Mondays also include the whole week
+    - cron: '15 5 * * *'   # backup only; GitHub often skips it
   workflow_dispatch:
 
 permissions:
@@ -14,6 +17,7 @@ concurrency:
 
 jobs:
   calendar:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' || contains(github.event.workflow_run.created_at, 'T05:') }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
