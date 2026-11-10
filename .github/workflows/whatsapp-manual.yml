@@ -43,7 +43,8 @@ jobs:
       - name: Restore WhatsApp session
         run: openssl enc -d -aes-256-cbc -pbkdf2 -pass env:SESSION_KEY -in wa-session.enc | tar xz
       - name: Send
-        run: node -e "require('./src/send').sendToSelf({ text: process.env.MSG.split(String.fromCharCode(92) + 'n').join(String.fromCharCode(10)) }).then(() => process.exit(0)).catch(e => { console.error(e.message); process.exit(1); })"
+        run: |
+          node -e "require('./src/send').sendToSelf({ text: process.env.MSG.split(String.fromCharCode(92) + 'n').join(String.fromCharCode(10)) }).then(() => process.exit(0)).catch(e => { console.error(e.message); process.exit(1); })"
       - name: Save session
         if: always()
         run: |
