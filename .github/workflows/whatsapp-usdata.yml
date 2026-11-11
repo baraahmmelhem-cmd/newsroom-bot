@@ -2,7 +2,7 @@ name: US Data Watch
 
 on:
   workflow_run:            # every hour, right after "Hourly news"
-    workflows: ["Hourly news"]
+    workflows: ["WhatsApp Breaking News"]   # chained: the WhatsApp jobs run one after another so none is cancelled
     types: [completed]
   workflow_dispatch:       # can also be started by a timer at release time
 
