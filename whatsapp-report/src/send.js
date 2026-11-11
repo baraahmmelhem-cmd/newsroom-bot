@@ -120,7 +120,45 @@ async function connectPairing() {
   throw new Error('Pairing window ended without linking. Run pair again and enter the code within 2 minutes.');
 }
 
+
+// ---- GREEN-API delivery (preferred) ----
+// The WhatsApp link lives on GREEN-API's servers and stays connected, so messages never arrive locked.
+// Baileys below is only a fallback when GREENAPI_API_TOKEN is missing.
+const GREEN_ID = process.env.GREENAPI_ID_INSTANCE || '710722798836';
+const GREEN_HOST = process.env.GREENAPI_URL || 'https://7107.api.greenapi.com';
+function greenOn() { return !!process.env.GREENAPI_API_TOKEN; }
+async function greenSend({ imagePath, caption, text }) {
+  const token = process.env.GREENAPI_API_TOKEN;
+  const chatId = phoneDigits() + '@c.us';
+  const base = GREEN_HOST + '/waInstance' + GREEN_ID;
+  for (let attempt = 1; attempt <= 4; attempt++) {
+    try {
+      let res;
+      if (imagePath) {
+        const ext = path.extname(imagePath).toLowerCase();
+        const type = ext === '.jpg' || ext === '.jpeg' ? 'image/jpeg' : 'image/png';
+        const fd = new FormData();
+        fd.append('chatId', chatId);
+        fd.append('caption', caption || '');
+        fd.append('file', new Blob([fs.readFileSync(imagePath)], { type }), path.basename(imagePath));
+        res = await fetch(base + '/sendFileByUpload/' + token, { method: 'POST', body: fd });
+      } else {
+        res = await fetch(base + '/sendMessage/' + token, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ chatId, message: text || '' })
+        });
+      }
+      const body = await res.text();
+      if (res.ok && /idMessage/.test(body)) { console.log('[green] message sent to self chat ' + body); return; }
+      console.log('[green] attempt ' + attempt + ' failed: HTTP ' + res.status + ' ' + body.slice(0, 200));
+    } catch (e) { console.log('[green] attempt ' + attempt + ' error: ' + e.message); }
+    await delay(5000 * attempt);
+  }
+  throw new Error('GREEN-API send failed after 4 attempts');
+}
+
 async function sendToSelf({ imagePath, caption, text }) {
+  if (greenOn()) return greenSend({ imagePath, caption, text });
   if (!hasSession() || !isRegistered()) throw new Error('No WhatsApp session yet. Run the workflow with mode=pair first.');
   const sock = await connectExisting();
   const jid = phoneDigits() + '@s.whatsapp.net';
@@ -149,4 +187,4 @@ async function pair() {
   sock.end(undefined);
 }
 
-module.exports = { sendToSelf, pair, hasSession };
+module.exports = { sendToSelf, pair, hasSession: () => greenOn() || hasSession() };
