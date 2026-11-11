@@ -2,7 +2,7 @@ name: WhatsApp Economic Calendar
 
 on:
   workflow_run:            # right after "Hourly news" (dispatched every hour); the job runs only on the 8:00 Amman one
-    workflows: ["Hourly news"]
+    workflows: ["WhatsApp Morning Report"]   # chained: the WhatsApp jobs run one after another so none is cancelled
     types: [completed]
   workflow_dispatch:
 
