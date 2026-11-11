@@ -28,6 +28,7 @@ jobs:
     env:
       WHATSAPP_PHONE: ${{ secrets.WHATSAPP_PHONE }}
       SESSION_KEY: ${{ secrets.SESSION_KEY }}
+      GREENAPI_API_TOKEN: ${{ secrets.GREENAPI_API_TOKEN }}
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
       MODE: ${{ github.event.inputs.mode || 'send' }}
       REPORT_KIND: ${{ (contains(github.event.workflow_run.created_at, 'T17:') || github.event.inputs.mode == 'evening') && 'evening' || 'morning' }}
