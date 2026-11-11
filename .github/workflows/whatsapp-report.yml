@@ -2,7 +2,7 @@ name: WhatsApp Morning Report
 
 on:
   workflow_run:            # runs right after "Hourly news" (dispatched every hour); the job below only runs at 8:00 and 21:00 Dubai
-    workflows: ["Hourly news"]
+    workflows: ["US Data Watch"]   # chained: the WhatsApp jobs run one after another so none is cancelled
     types: [completed]
   workflow_dispatch:
     inputs:
