@@ -51,6 +51,7 @@ async function connectOnce({ pairing }) {
     generateHighQualityLinkPreview: false
   });
   sock.ev.on('creds.update', saveCreds);
+  sock.__saveCreds = saveCreds;
 
   return new Promise(async (resolve, reject) => {
     let settled = false;
@@ -130,8 +131,12 @@ async function sendToSelf({ imagePath, caption, text }) {
     await sock.sendMessage(jid, { text: text || '' });
   }
   console.log('[wa] message sent to self chat');
-  await delay(4000); // let the server ack before closing
+  // Give WhatsApp time to ack and Baileys time to write every new key to disk, then save once more.
+  // Closing too fast leaves the saved keys older than the phone's, and later messages arrive locked.
+  await delay(10000);
+  try { await sock.__saveCreds(); } catch (e) { console.log('[wa] final save failed', e.message); }
   sock.end(undefined);
+  await delay(3000);
 }
 
 async function pair() {
