@@ -20,6 +20,7 @@ jobs:
     env:
       WHATSAPP_PHONE: ${{ secrets.WHATSAPP_PHONE }}
       SESSION_KEY: ${{ secrets.SESSION_KEY }}
+      GREENAPI_API_TOKEN: ${{ secrets.GREENAPI_API_TOKEN }}
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
       NEWSROOM_SESSION: ${{ secrets.NEWSROOM_SESSION }}
       PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
