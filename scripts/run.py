@@ -51,6 +51,8 @@ FEEDS = {
     "CNBC Economy": "https://www.cnbc.com/id/20910258/device/rss/rss.html",
     "CNBC Markets": "https://www.cnbc.com/id/10000664/device/rss/rss.html",
     "MarketWatch": "https://feeds.content.dowjones.io/public/rss/mw_topstories",
+    "CNBC Top News": "https://www.cnbc.com/id/100003114/device/rss/rss.html",
+    "CNBC Tech": "https://www.cnbc.com/id/19854910/device/rss/rss.html",
 }
 
 
@@ -67,7 +69,7 @@ def banned(text):
     s = " " + (text or "").lower() + " "
     return any(w in s for w in BANNED)
 
-URGENT_WORDS = ("الفيدرالي", "الفائدة", "التضخم", "الوظائف", "الناتج المحلي", "اختراق")
+URGENT_WORDS = ("الفيدرالي", "الفائدة", "التضخم", "الوظائف", "الناتج المحلي", "اختراق", "استقالة", "انهيار", "إفلاس")
 
 def allow_urgent(item):
     """'عاجل' is kept only for real breaking items: Fed/US data or a major hack."""
@@ -82,8 +84,8 @@ def minutes_since_last():
 
 MUST = False
 SLOT_HOURS = (9, 15, 21)  # Amman time: 3 items a day
-MUST_RULE = ("\nIMPORTANT: this is one of the 3 daily slots. You MUST publish the strongest "
-             "story from the list (headlines up to 8 hours old are allowed now) that is not a repeat and "
+MUST_RULE = ("\nIMPORTANT: this is the every-2-hours run. Compare ALL candidates; you MUST publish the strongest "
+             "story from the list (headlines up to 3 hours old) that is not a repeat and "
              "not about Europe or Israel. Reply skip ONLY if literally every candidate is a repeat.")
 
 def fetch_headlines():
@@ -166,7 +168,7 @@ def is_repeat(title, posted, threshold=0.5):
     """Hard duplicate check in code: many shared words with a recent title, in the SAME
     direction (a rise after a fall is a real new development, not a repeat)."""
     new, d_new = _words(title), _direction(title)
-    for old in posted[-15:]:
+    for old in posted[-40:]:
         o = _words(old)
         d_old = _direction(old)
         if d_new and d_old and d_new != d_old:
@@ -190,9 +192,11 @@ Already published on the site (the SAME event or the same topic, e.g. another Fe
 item, is a REPEAT; only a genuinely new development counts as new):
 {posted}
 
-STRENGTH TEST: before choosing, rank the candidates by how much they move the crypto market TODAY.
+STRENGTH TEST: before choosing, compare ALL candidates and rank them by how much they move the markets
+(crypto and US stocks) TODAY.
 Strong: BTC/ETH price moves, spot ETF flows, US data/Fed, major regulation or court decisions, hacks,
-buys/sells over 500 million dollars by big players. Weak (choose only if nothing strong exists):
+buys/sells over 500 million dollars by big players, shock events at the biggest US companies
+(a CEO of Nvidia/Apple/Microsoft/Tesla/Amazon/Google/Meta resigning, a huge earnings miss) that move stocks and crypto. Weak (choose only if nothing strong exists):
 bank pilots, partnerships, product launches, licences, conference talk, single-company news without
 market impact.
 TASK: choose the single STRONGEST high-impact story that is NOT a repeat. Priority: big BTC/ETH
@@ -207,14 +211,16 @@ level, post that rise as the story right away. CONSISTENCY: look at the "Already
 never publish a story that contradicts the current BTC direction in the headlines (do not write
 "BTC falls/drops" when the latest headlines show it rising, and vice versa). If an older published
 item is now outdated, write the new development as an update ("يرتد", "يتعافى") instead.
-ONLY CRYPTO stories (Bitcoin and major coins, ETFs, exchanges, regulation of crypto, hacks, big institutional moves); a US/Fed/China/Trump story only if it is directly about crypto. NEVER pick anything about Europe
+SCOPE: crypto stories AND major market-moving US/global-economy stories: Fed and US data, Trump decisions on
+tariffs/economy/crypto, oil/gold/dollar/Treasury-yield shocks, and shock events at mega-cap companies that move
+stocks and crypto. Pick the single story with the BIGGEST market impact right now. NEVER pick anything about Europe
 (ECB, Lagarde, EU, eurozone, European countries or companies) or Israel; skip those entirely.
 
 FACTS: use ONLY facts present in the headlines and their summaries above (the text after " — "). Never invent numbers, names or quotes.
 If a detail is not in the headlines, leave it out.
 
 WRITING (Modern Standard Arabic, clear and well ordered; the user publishes only 3 items a day,
-so each one must be one of the 3 most important CRYPTO stories of the day):
+one item every 2 hours, so each one must be the most important market story of those 2 hours):
 - title: one clear, grammatical Arabic headline, max 12 words, that tells the story and includes the key
   number. Start with who did what (e.g. "شركة التعدين مارا تبيع ..."). Never translate English words
   literally into odd Arabic (wrong: "معدن تكتل مارا"); write it as an Arab financial journalist would.
@@ -233,7 +239,7 @@ so each one must be one of the 3 most important CRYPTO stories of the day):
   never with an English word, a ticker, a number or a symbol. Write coin and company names in Arabic
   (بيتكوين، إيثريوم، ريبل، سولانا، بلاك روك، الفيدرالي). Put numbers in the middle of the sentence.
 - Correct Arabic grammar, no slang, no buy/sell advice, no hashtags, no emoji.
-- category: always "كريبتو".
+- category: "كريبتو" for crypto stories, "اقتصاد" for economy/markets/company stories, "عاجل" only for a truly breaking shock.
 - REPEATS: a story about the same company/figure/event as ANY item in the published list is a
   repeat even if worded differently. Never publish the same event twice.
 
@@ -349,6 +355,25 @@ def publish(item):
     sys.exit(f"Publish failed: {last}")
 
 
+def site_titles():
+    """Titles already live on the newsroom (including items the owner posted by hand), so nothing is repeated."""
+    import re, html as _html
+    try:
+        s = requests.Session()
+        s.headers["User-Agent"] = "Mozilla/5.0 newsroom-bot"
+        s.cookies.set("mra_newsroom", env("NEWSROOM_SESSION"), domain="www.mr-amwal.com", path="/", secure=True)
+        r = s.get(f"{SITE}/newsroom", timeout=30)
+        r.raise_for_status()
+        found = re.findall(r'<b data-no-tr="" style="font-size:13.5px">(.*?)</b>', r.text, re.S)
+        titles = [_html.unescape(re.sub(r"<[^>]+>", "", t)).strip() for t in found]
+        titles = [t for t in titles if t]
+        print("Titles already on the site:", len(titles), flush=True)
+        return titles
+    except Exception as e:
+        print("Could not read the site's current items:", e)
+        return []
+
+
 def recently_posted():
     try:
         return (time.time() - float(LAST.read_text().strip())) < MIN_GAP_MIN * 60
@@ -361,18 +386,15 @@ def main():
     if os.environ.get("GITHUB_EVENT_NAME") == "schedule" and recently_posted():
         print(f"Posted less than {MIN_GAP_MIN} min ago; skipping this run.")
         return
-    from datetime import datetime, timezone, timedelta
-    amman_hour = (datetime.now(timezone.utc) + timedelta(hours=3)).hour
-    # The slot hour, plus one catch-up hour if the slot run published nothing (the 4h guard below stops doubles).
-    if amman_hour not in SLOT_HOURS and (amman_hour - 1) not in SLOT_HOURS:
-        print("Outside the 3 daily slots (9:00, 15:00, 21:00 Amman); nothing to do.")
+    # Every 2 hours, around the clock: the hourly trigger runs this, and it publishes once 2 hours have passed.
+    if minutes_since_last() < 110:
+        print("Published less than 2 hours ago; skipping.")
         return
-    if minutes_since_last() < 240:
-        print("Already published in this slot; skipping.")
-        return
-    FRESH_HOURS, MUST = 8, True
-    print("Daily slot", amman_hour, ": publishing the strongest crypto story of the last 8h.", flush=True)
+    FRESH_HOURS, MUST = 3, True
+    print("Every-2-hours run: publishing the strongest new market story of the last 3h.", flush=True)
     posted = load_state()
+    on_site = site_titles()
+    posted = posted + [t for t in on_site if t not in posted]
     headlines = fetch_headlines()
     if not headlines:
         print("No fresh headlines in the last few hours; nothing published.")
