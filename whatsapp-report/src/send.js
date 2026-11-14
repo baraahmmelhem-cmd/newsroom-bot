@@ -126,10 +126,35 @@ async function connectPairing() {
 // Baileys below is only a fallback when GREENAPI_API_TOKEN is missing.
 const GREEN_ID = process.env.GREENAPI_ID_INSTANCE || '710722798836';
 const GREEN_HOST = process.env.GREENAPI_URL || 'https://7107.api.greenapi.com';
+// Destination: the WhatsApp group "كل المصادر" (owner decision, 14 Nov). Its id is looked up by name
+// through GREEN-API (no id needs to be stored). Set WHATSAPP_CHAT_ID to force a chat id; if the group
+// cannot be found, messages fall back to the owner's own number.
+const GROUP_NAME = process.env.WHATSAPP_GROUP_NAME || 'كل المصادر';
+let _target;
+async function greenTarget() {
+  if (_target) return _target;
+  if (process.env.WHATSAPP_CHAT_ID) return (_target = process.env.WHATSAPP_CHAT_ID);
+  const base = GREEN_HOST + '/waInstance' + GREEN_ID;
+  const norm = s => String(s || '').replace(/[\u200e\u200f\u202a-\u202e«»"']/g, '').replace(/\s+/g, ' ').trim();
+  const want = norm(GROUP_NAME);
+  for (const method of ['getContacts', 'getChats']) {
+    try {
+      const r = await fetch(base + '/' + method + '/' + process.env.GREENAPI_API_TOKEN, { signal: AbortSignal.timeout(30000) });
+      const list = await r.json();
+      const groups = (Array.isArray(list) ? list : []).filter(c => String(c.id || '').endsWith('@g.us'));
+      const g = groups.find(c => norm(c.name) === want) || groups.find(c => norm(c.name).includes(want));
+      if (g) { console.log('[green] destination: group "' + norm(g.name) + '" ' + g.id); return (_target = g.id); }
+      console.log('[green] ' + method + ': ' + groups.length + ' groups, none named "' + want + '"');
+    } catch (e) { console.log('[green] ' + method + ' failed: ' + e.message); }
+  }
+  console.log('[green] group not found; sending to the owner number instead');
+  return (_target = phoneDigits() + '@c.us');
+}
+
 function greenOn() { return !!process.env.GREENAPI_API_TOKEN; }
 async function greenSend({ imagePath, caption, text }) {
   const token = process.env.GREENAPI_API_TOKEN;
-  const chatId = phoneDigits() + '@c.us';
+  const chatId = await greenTarget();
   const base = GREEN_HOST + '/waInstance' + GREEN_ID;
   for (let attempt = 1; attempt <= 4; attempt++) {
     try {
