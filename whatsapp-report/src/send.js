@@ -131,21 +131,44 @@ const GREEN_HOST = process.env.GREENAPI_URL || 'https://7107.api.greenapi.com';
 // cannot be found, messages fall back to the owner's own number.
 const GROUP_NAME = process.env.WHATSAPP_GROUP_NAME || 'كل المصادر';
 let _target;
+function arNorm(s) {
+  return String(s || '')
+    .replace(/[\u200e\u200f\u202a-\u202e\u2066-\u2069«»"'.,:!؟?\-_|]/g, '')
+    .replace(/[\u064b-\u0652\u0640]/g, '')          // harakat + tatweel
+    .replace(/[أإآٱ]/g, 'ا').replace(/ى/g, 'ي').replace(/ة/g, 'ه')
+    .replace(/[^\p{L}\p{N} ]/gu, ' ')                // emoji and symbols
+    .replace(/\s+/g, ' ').trim().toLowerCase();
+}
 async function greenTarget() {
   if (_target) return _target;
   if (process.env.WHATSAPP_CHAT_ID) return (_target = process.env.WHATSAPP_CHAT_ID);
   const base = GREEN_HOST + '/waInstance' + GREEN_ID;
-  const norm = s => String(s || '').replace(/[\u200e\u200f\u202a-\u202e«»"']/g, '').replace(/\s+/g, ' ').trim();
-  const want = norm(GROUP_NAME);
+  const token = process.env.GREENAPI_API_TOKEN;
+  const want = arNorm(GROUP_NAME);
+  const hit = name => { const n = arNorm(name); return n && (n === want || n.includes(want)); };
+  let groups = [];
   for (const method of ['getContacts', 'getChats']) {
     try {
-      const r = await fetch(base + '/' + method + '/' + process.env.GREENAPI_API_TOKEN, { signal: AbortSignal.timeout(30000) });
+      const r = await fetch(base + '/' + method + '/' + token, { signal: AbortSignal.timeout(30000) });
       const list = await r.json();
-      const groups = (Array.isArray(list) ? list : []).filter(c => String(c.id || '').endsWith('@g.us'));
-      const g = groups.find(c => norm(c.name) === want) || groups.find(c => norm(c.name).includes(want));
-      if (g) { console.log('[green] destination: group "' + norm(g.name) + '" ' + g.id); return (_target = g.id); }
-      console.log('[green] ' + method + ': ' + groups.length + ' groups, none named "' + want + '"');
+      const gs = (Array.isArray(list) ? list : []).filter(c => String(c.id || '').endsWith('@g.us'));
+      const g = gs.find(c => hit(c.name) || hit(c.contactName) || hit(c.subject));
+      if (g) { console.log('[green] destination: group ' + g.id); return (_target = g.id); }
+      if (gs.length > groups.length) groups = gs;
     } catch (e) { console.log('[green] ' + method + ' failed: ' + e.message); }
+  }
+  console.log('[green] group names seen: ' + groups.slice(0, 60).map(c => c.name || '(no name)').join(' | '));
+  // Names are missing for some groups in the contact list: ask each group's subject.
+  for (const c of groups.filter(c => !c.name).slice(0, 70)) {
+    try {
+      const r = await fetch(base + '/getGroupData/' + token, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ groupId: c.id }), signal: AbortSignal.timeout(20000)
+      });
+      const d = await r.json();
+      if (hit(d.subject)) { console.log('[green] destination: group ' + c.id + ' (found by subject)'); return (_target = c.id); }
+    } catch (e) { /* keep looking */ }
+    await delay(400);
   }
   console.log('[green] group not found; sending to the owner number instead');
   return (_target = phoneDigits() + '@c.us');
