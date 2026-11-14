@@ -22,12 +22,14 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           NEWSROOM_KEY: ${{ secrets.NEWSROOM_KEY }}
           NEWSROOM_SESSION: ${{ secrets.NEWSROOM_SESSION }}
+          GREENAPI_API_TOKEN: ${{ secrets.GREENAPI_API_TOKEN }}
         run: python scripts/run.py
       - name: Pinned story (renewed every 3 days)
         if: always()
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           NEWSROOM_SESSION: ${{ secrets.NEWSROOM_SESSION }}
+          GREENAPI_API_TOKEN: ${{ secrets.GREENAPI_API_TOKEN }}
         run: python scripts/pinned.py || true
       - name: Save state
         if: always()
