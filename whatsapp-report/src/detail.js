@@ -47,6 +47,17 @@ async function yahoo(symbol) {
 const fmt = (n, d = 0) => n == null ? 'n/a' : Number(n).toLocaleString('en-US', { maximumFractionDigits: d });
 const pct = n => n == null ? 'n/a' : (n >= 0 ? '+' : '') + n.toFixed(1) + '%';
 
+// Manager rule (14 Nov): the text report is at most 50 words. Keep whole lines while within the limit.
+function capWords(text, max = 50) {
+  const out = []; let n = 0;
+  for (const line of text.split('\n')) {
+    const w = line.trim() ? line.trim().split(/\s+/).length : 0;
+    if (out.length && n + w > max) break;
+    out.push(line); n += w;
+  }
+  return out.join('\n').trim();
+}
+
 async function detailText(data, dateLabel) {
   const key = process.env.GEMINI_API_KEY;
   if (!key) return null;
@@ -75,18 +86,12 @@ async function detailText(data, dateLabel) {
     'RULES: Modern Standard Arabic, concise, professional, no emojis, no tables, no source names, no investment advice.',
     'Use ONLY numbers listed in LIVE PRICES or written in a headline. Never invent index levels or percentages; if a figure is missing, describe without it.',
     'Never mention Europe or Israel.',
-    'FORMAT exactly (WhatsApp bold with *):',
+    'LENGTH (manager rule): the WHOLE message, title included, must be 50 words or fewer. Be extremely tight.',
+    'FORMAT exactly (WhatsApp bold with *), four lines only:',
     '*' + title + '*',
-    'One sentence headline summary.',
-    '',
-    '*الأسعار:*',
-    'البيتكوين: X دولار (±%)', 'الإيثريوم: X دولار (±%)', 'XRP: X دولار (±%)', 'الذهب: X دولار للأونصة (±%)', 'برنت: X دولار للبرميل (±%)',
-    '',
-    '*بينانس والكريبتو:* 1-2 sentences.',
-    '*أمريكا:* 1-2 sentences (Congress/White House/Fed and effect on the dollar).',
-    '*الإمارات والخليج:* 1-2 sentences (Dubai/Abu Dhabi/Saudi/Qatar markets, UAE economy or crypto regulation).',
-    '*أسواق الأسهم:* 1 sentence.',
-    '*' + (EVE ? 'غدًا' : 'الخلاصة') + ':* 1 sentence on what to watch.',
+    'One short sentence: the single most important development of the day.',
+    'البيتكوين X دولار (±%) · الذهب X دولار (±%) · برنت X دولار (±%)',
+    'One short sentence: what to watch next (US data/Fed, crypto or Gulf markets).',
     'Reply with the message text only.'
   ].join('\n');
 
@@ -100,7 +105,7 @@ async function detailText(data, dateLabel) {
       if (!r.ok) throw new Error('HTTP ' + r.status);
       const j = await r.json();
       const text = (j.candidates?.[0]?.content?.parts || []).map(x => x.text || '').join('').trim();
-      if (text.length > 80) { console.log('[detail] written with', model); return text.replace(/^\x60{3}\w*\n?|\x60{3}$/g, '').trim(); }
+      if (text.length > 80) { console.log('[detail] written with', model); return capWords(text.replace(/^\x60{3}\w*\n?|\x60{3}$/g, '').trim()); }
       throw new Error('empty reply');
     } catch (e) {
       console.warn('[detail]', model, 'failed:', e.message);
