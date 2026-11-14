@@ -56,6 +56,7 @@ def main():
                    headers={"Origin": run.SITE, "Referer": f"{run.SITE}/newsroom"}, timeout=30)
         if r.ok:
             print("Pinned for 72h:", item["title"])
+            run.whatsapp(item)
             PIN.write_text(json.dumps({"ts": now, "title": item["title"]}, ensure_ascii=False, indent=2),
                            encoding="utf-8")
             posted = run.load_state()
