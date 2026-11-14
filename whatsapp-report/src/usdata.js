@@ -195,6 +195,25 @@ function setOutput(found) {
   if (process.env.GITHUB_OUTPUT) fs.appendFileSync(process.env.GITHUB_OUTPUT, 'found=' + (found ? 'true' : 'false') + '\n');
 }
 
+// Looks for the published result of one release group. Returns the WhatsApp text, or null if not out yet.
+// Top-tier releases are also posted to the newsroom here.
+async function resultFor(g) {
+  const q = (QUERIES.find(([re]) => g.events.some(e => re.test(e.title))) || [null, g.events[0].title + ' US'])[1];
+  let heads = [];
+  try { heads = await headlinesSince(q, new Date(g.d.getTime() - 60000)); } catch (e) { console.log('[usdata] headlines failed', e.message); }
+  console.log('[usdata]', q, '- headlines after release:', heads.length);
+  if (!heads.length) return null;
+  const top = g.events.some(e => TOP_TIER.test(e.title));
+  let res;
+  try { res = await gemini(resultPrompt(g, heads, top)); } catch (e) { console.log('[usdata]', e.message); return null; }
+  if (!res || !res.found || !res.actuals || !Object.keys(res.actuals).length) { console.log('[usdata] result not in the news yet:', q); return null; }
+  const lines = g.events.map(e => block(e, res.actuals[e.title]));
+  if (top && res.news && res.news.title && res.news.body) {
+    try { await postNews(res.news); } catch (e) { console.log('[usdata] newsroom failed', e.message); }
+  }
+  return '🇺🇸 *صدرت الآن: بيانات أمريكية*\n' + 'الساعة ' + timeAr(g.d) + ' بتوقيت دبي\n\n' + lines.join('\n\n') + (res.meaning ? '\n\n' + res.meaning : '');
+}
+
 async function pick() {
   const now = new Date();
   const state = loadState();
@@ -209,21 +228,8 @@ async function pick() {
   // 2) results
   const due = groups.filter(g => g.d <= now && (now - g.d) <= RESULT_WINDOW_MIN * 60000 && !state.done[g.key]);
   for (const g of due) {
-    const q = (QUERIES.find(([re]) => g.events.some(e => re.test(e.title))) || [null, g.events[0].title + ' US'])[1];
-    let heads = [];
-    try { heads = await headlinesSince(q, new Date(g.d.getTime() - 60000)); } catch (e) { console.log('[usdata] headlines failed', e.message); }
-    console.log('[usdata]', q, '- headlines after release:', heads.length);
-    if (!heads.length) continue;
-    const top = g.events.some(e => TOP_TIER.test(e.title));
-    let res;
-    try { res = await gemini(resultPrompt(g, heads, top)); } catch (e) { console.log('[usdata]', e.message); continue; }
-    if (!res || !res.found || !res.actuals || !Object.keys(res.actuals).length) { console.log('[usdata] result not in the news yet:', q); continue; }
-    const lines = g.events.map(e => block(e, res.actuals[e.title]));
-    msgs.push('🇺🇸 *صدرت الآن: بيانات أمريكية*\n' + 'الساعة ' + timeAr(g.d) + ' بتوقيت دبي\n\n' + lines.join('\n\n') + (res.meaning ? '\n\n' + res.meaning : ''));
-    state.done[g.key] = Date.now();
-    if (top && res.news && res.news.title && res.news.body) {
-      try { await postNews(res.news); } catch (e) { console.log('[usdata] newsroom failed', e.message); }
-    }
+    const msg = await resultFor(g);
+    if (msg) { msgs.push(msg); state.done[g.key] = Date.now(); }
   }
 
   saveState(state);
@@ -231,6 +237,37 @@ async function pick() {
   fs.writeFileSync(OUT, JSON.stringify(msgs, null, 2));
   msgs.forEach(m => console.log('----\n' + m));
   setOutput(msgs.length > 0);
+}
+
+// Live mode: if a release is due within the next 45 minutes (or came out in the last 10),
+// stay running, wait for it, and send the result the moment the news has it (checks every 2 minutes
+// for up to 25 minutes after the release). This removes the wait for the next hourly run.
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+async function live() {
+  const state = loadState();
+  state.reminded = state.reminded || {}; state.done = state.done || {};
+  const now = Date.now();
+  const groups = (await loadEvents()).filter(g => g.d.getTime() > now - 10 * 60000 && g.d.getTime() - now <= 45 * 60000 && !state.done[g.key]);
+  if (!groups.length) { console.log('[usdata] live: no release within the next 45 minutes'); return; }
+  const wa = require('./send');
+  for (const g of groups) {
+    const wait = g.d.getTime() + 90000 - Date.now();
+    console.log('[usdata] live: waiting', Math.max(0, Math.round(wait / 1000)), 's for the release at', g.key);
+    if (wait > 0) await sleep(wait);
+    const end = g.d.getTime() + 25 * 60000;
+    while (Date.now() < end) {
+      const msg = await resultFor(g);
+      if (msg) {
+        await wa.sendToSelf({ text: msg });
+        state.done[g.key] = Date.now();
+        saveState(state);
+        console.log('[usdata] live: result sent for', g.key);
+        break;
+      }
+      await sleep(120000);
+    }
+  }
+  saveState(state);
 }
 
 async function send() {
@@ -245,14 +282,14 @@ if (require.main === module) {
   (async () => {
     const mode = process.argv[2] || 'pick';
     try {
-      if (mode === 'send') await send(); else await pick();
+      if (mode === 'send') await send(); else if (mode === 'live') await live(); else await pick();
       process.exit(0);
     } catch (e) {
       console.error('FAILED:', e.message);
-      if (mode !== 'send') setOutput(false);
+      if (mode === 'pick') setOutput(false);
       process.exit(mode === 'send' ? 1 : 0);
     }
   })();
 }
 
-module.exports = { pick, send, reminderText, resultPrompt, block };
+module.exports = { pick, send, live, reminderText, resultPrompt, block };
