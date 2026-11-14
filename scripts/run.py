@@ -53,6 +53,7 @@ FEEDS = {
     "MarketWatch": "https://feeds.content.dowjones.io/public/rss/mw_topstories",
     "CNBC Top News": "https://www.cnbc.com/id/100003114/device/rss/rss.html",
     "CNBC Tech": "https://www.cnbc.com/id/19854910/device/rss/rss.html",
+    "Al Jazeera": "https://www.aljazeera.com/xml/rss/all.xml",
 }
 
 
@@ -212,7 +213,7 @@ never publish a story that contradicts the current BTC direction in the headline
 "BTC falls/drops" when the latest headlines show it rising, and vice versa). If an older published
 item is now outdated, write the new development as an update ("يرتد", "يتعافى") instead.
 SCOPE: crypto stories AND major market-moving US/global-economy stories: Fed and US data, Trump decisions on
-tariffs/economy/crypto, oil/gold/dollar/Treasury-yield shocks, and shock events at mega-cap companies that move
+tariffs/economy/crypto, US-China, Russia (when market-moving), oil/gold/dollar/Treasury-yield shocks, and shock events at mega-cap companies that move
 stocks and crypto. Pick the single story with the BIGGEST market impact right now. NEVER pick anything about Europe
 (ECB, Lagarde, EU, eurozone, European countries or companies) or Israel; skip those entirely.
 
@@ -221,20 +222,15 @@ If a detail is not in the headlines, leave it out.
 
 WRITING (Modern Standard Arabic, clear and well ordered; the user publishes only 3 items a day,
 one item every 2 hours, so each one must be the most important market story of those 2 hours):
-- title: one clear, grammatical Arabic headline, max 12 words, that tells the story and includes the key
+- title: one punchy, grammatical Arabic headline in the style of an Al Jazeera news card, max 12 words, that tells the story and includes the key
   number. Start with who did what (e.g. "شركة التعدين مارا تبيع ..."). Never translate English words
   literally into odd Arabic (wrong: "معدن تكتل مارا"); write it as an Arab financial journalist would.
   No emoji. No quotes.
-- body: plain text with line breaks as real new lines, in this exact order:
-  1) One Arabic lead sentence (max 35 words) with the key numbers: what happened.
-  2) An empty line, then two short Arabic bullet points, each starting with "• ". EACH bullet must add a
-     NEW concrete fact that is NOT in the title or the lead (another number, a percentage, a comparison,
-     who else is involved, what happens next). Never restate the lead in other words. If the headlines
-     and summaries do not give enough facts for two new bullets, pick a different story.
-  3) An empty line, then one Arabic sentence of context that links the story to the market today and
-     uses the LIVE MARKET line (e.g. the Bitcoin price and its 24h change). No vague filler.
-  4) An empty line, then a short English headline on its own line, then one English sentence.
-  5) An empty line, then "المصدر: " followed by the outlet names from the headlines, separated by " · ".
+- body: AL JAZEERA CARD STYLE (presentation only). Write it in our OWN words, never copy any outlet's
+  sentences. Exactly: ONE tight Arabic sentence (max 30 words) with the key facts and numbers that adds what
+  the title does not say (who, how much, why it matters for the market); then an empty line; then
+  "المصدر: " followed by the outlet names from the headlines, separated by " · ". Nothing else: no bullets,
+  no English lines, no extra paragraphs.
 - ARABIC TEXT DIRECTION RULE (very important): every Arabic line must START with an Arabic word,
   never with an English word, a ticker, a number or a symbol. Write coin and company names in Arabic
   (بيتكوين، إيثريوم، ريبل، سولانا، بلاك روك، الفيدرالي). Put numbers in the middle of the sentence.
@@ -355,6 +351,31 @@ def publish(item):
     sys.exit(f"Publish failed: {last}")
 
 
+GREEN_ID = os.environ.get("GREENAPI_ID_INSTANCE", "710722798836")
+GREEN_HOST = os.environ.get("GREENAPI_URL", "https://7107.api.greenapi.com")
+WA_CHAT = os.environ.get("WHATSAPP_CHAT_ID", "120363410855267217@g.us")  # owner's group «وين المصادر ؟»
+
+
+def whatsapp(item):
+    """Every newsroom item also goes to the owner's WhatsApp group (owner decision, 14 Nov)."""
+    token = os.environ.get("GREENAPI_API_TOKEN")
+    if not token:
+        print("GREENAPI_API_TOKEN missing; WhatsApp copy skipped.")
+        return
+    text = f"📰 *{item['title']}*\n\n{item['body']}"
+    for attempt in range(3):
+        try:
+            r = requests.post(f"{GREEN_HOST}/waInstance{GREEN_ID}/sendMessage/{token}",
+                              json={"chatId": WA_CHAT, "message": text}, timeout=30)
+            if r.ok and "idMessage" in r.text:
+                print("WhatsApp copy sent to the group.")
+                return
+            print("WhatsApp copy failed: HTTP", r.status_code)
+        except Exception as e:
+            print("WhatsApp copy error:", type(e).__name__)
+        time.sleep(5 * (attempt + 1))
+
+
 def site_titles():
     """Titles already live on the newsroom (including items the owner posted by hand), so nothing is repeated."""
     import re, html as _html
@@ -427,6 +448,7 @@ def main():
         print("Skipped as repeat of:", dup)
         return
     publish(item)
+    whatsapp(item)
     posted.append(item["title"])
     save_state(posted)
     LAST.write_text(str(int(time.time())))
