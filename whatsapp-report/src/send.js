@@ -126,10 +126,10 @@ async function connectPairing() {
 // Baileys below is only a fallback when GREENAPI_API_TOKEN is missing.
 const GREEN_ID = process.env.GREENAPI_ID_INSTANCE || '710722798836';
 const GREEN_HOST = process.env.GREENAPI_URL || 'https://7107.api.greenapi.com';
-// Destination: the WhatsApp group "كل المصادر" (owner decision, 14 Nov). Its id is looked up by name
+// Destination: the owner's WhatsApp group «وين المصادر ؟» (owner decision, 14 Nov). Its id is looked up by name
 // through GREEN-API (no id needs to be stored). Set WHATSAPP_CHAT_ID to force a chat id; if the group
 // cannot be found, messages fall back to the owner's own number.
-const GROUP_NAME = process.env.WHATSAPP_GROUP_NAME || 'كل المصادر';
+const GROUP_NAME = process.env.WHATSAPP_GROUP_NAME || 'وين المصادر';
 let _target;
 function arNorm(s) {
   return String(s || '')
