@@ -445,8 +445,22 @@ def main():
         item["hot"] = False
     dup = is_repeat(item.get("title", ""), posted)
     if dup:
-        print("Skipped as repeat of:", dup)
-        return
+        print("Repeat of:", dup, "- asking once more for a different story.", flush=True)
+        item = write_item(headlines, posted + [item.get("title", "")], btc)
+        if item.get("skip") or not item.get("title"):
+            print("No other strong story; nothing published.")
+            return
+        if banned(item.get("title", "") + " " + item.get("body", "")):
+            print("Skipped (Europe/Israel rule):", item.get("title"))
+            return
+        if not allow_urgent(item):
+            item["hot"] = False
+            if item.get("category") == "عاجل":
+                item["category"] = "اقتصاد"
+        dup = is_repeat(item.get("title", ""), posted)
+        if dup:
+            print("Skipped as repeat of:", dup)
+            return
     publish(item)
     whatsapp(item)
     posted.append(item["title"])
