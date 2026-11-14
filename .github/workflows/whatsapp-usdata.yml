@@ -16,7 +16,7 @@ concurrency:
 jobs:
   watch:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 55
     env:
       WHATSAPP_PHONE: ${{ secrets.WHATSAPP_PHONE }}
       SESSION_KEY: ${{ secrets.SESSION_KEY }}
@@ -41,14 +41,12 @@ jobs:
         run: node src/usdata.js pick
 
       - name: Cache node modules
-        if: steps.pick.outputs.found == 'true'
         uses: actions/cache@v4
         with:
           path: whatsapp-report/node_modules
           key: wa-node-${{ hashFiles('whatsapp-report/package.json') }}
 
       - name: Install
-        if: steps.pick.outputs.found == 'true'
         run: '[ -d node_modules ] || npm install --no-audit --no-fund'
 
       - name: Restore WhatsApp session
@@ -58,6 +56,9 @@ jobs:
       - name: Send to WhatsApp
         if: steps.pick.outputs.found == 'true'
         run: node src/usdata.js send
+
+      - name: Live result (waits for a release due within 45 min, sends it the moment it is out)
+        run: node src/usdata.js live
 
       - name: Save session and state
         if: always()
