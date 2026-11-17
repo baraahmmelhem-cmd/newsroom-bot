@@ -413,6 +413,13 @@ def whatsapp(item):
                               json={"chatId": WA_CHAT, "message": text}, timeout=30)
             if r.ok and "idMessage" in r.text:
                 print("WhatsApp copy sent to the group.")
+                try:  # tell the breaking-news bot this story is already in the group, so it is not sent twice
+                    sent_path = Path(__file__).resolve().parent.parent / "whatsapp-report" / "alerts-sent.json"
+                    sent = json.loads(sent_path.read_text(encoding="utf-8")) if sent_path.exists() else []
+                    sent.append({"title": item["title"], "ts": int(time.time() * 1000)})
+                    sent_path.write_text(json.dumps(sent[-300:], ensure_ascii=False, indent=2), encoding="utf-8")
+                except Exception as e:
+                    print("Could not note the story for the WhatsApp bot:", e)
                 return
             print("WhatsApp copy failed: HTTP", r.status_code)
         except Exception as e:
