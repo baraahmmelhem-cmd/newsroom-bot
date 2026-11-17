@@ -30,7 +30,20 @@ async function crypto() {
     change: by[id].price_change_percentage_24h,
     spark: (by[id].sparkline_in_7d?.price || []).slice(-48) // last ~48h
   } : { sym, name, price: null, change: null, spark: [] };
-  return [pick('bitcoin', 'BTC', 'Bitcoin'), pick('ethereum', 'ETH', 'Ethereum'), pick('ripple', 'XRP', 'Ripple')];
+  const list = [pick('bitcoin', 'BTC', 'Bitcoin'), pick('ethereum', 'ETH', 'Ethereum'), pick('ripple', 'XRP', 'Ripple')];
+  // Owner rule (17 Nov): a price is shown only when at least 2 of CoinGecko/Coinbase/Kraken agree within 1%.
+  try {
+    const v = await require('./verify').verifiedPrices(['BTC', 'ETH', 'XRP']);
+    for (const c of list) {
+      const ok = v[c.sym];
+      if (!ok) { console.warn('[data]', c.sym, 'price not verified by 2 sources; hidden'); c.price = null; c.change = null; continue; }
+      if (c.price == null || Math.abs(c.price - ok.price) / ok.price > 0.01) { c.price = ok.price; c.change = ok.change; }
+    }
+  } catch (e) {
+    console.warn('[data] price verification failed; prices hidden:', e.message);
+    for (const c of list) { c.price = null; c.change = null; }
+  }
+  return list;
 }
 
 async function global() {
