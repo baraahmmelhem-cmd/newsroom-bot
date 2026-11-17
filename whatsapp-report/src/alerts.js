@@ -102,7 +102,396 @@ function setOutput(found) {
   if (process.env.GITHUB_OUTPUT) fs.appendFileSync(process.env.GITHUB_OUTPUT, 'found=' + (found ? 'true' : 'false') + '\n');
 }
 
-function buildPrompt(headlines, sent) {
+// Live prices: the ONLY coin prices an alert may state (headlines are often hours old).
+async function livePrices() {
+  const out = {};
+  try {
+    const r = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,ripple,solana&vs_currencies=usd&include_24hr_change=true',
+      { headers: { 'User-Agent': 'Mozilla/5.0 mr-amwal-alerts' }, signal: AbortSignal.timeout(20000) });
+    const j = await r.json();
+    for (const [id, sym] of [['bitcoin', 'BTC'], ['ethereum', 'ETH'], ['ripple', 'XRP'], ['solana', 'SOL']]) {
+      if (j[id] && j[id].usd) out[sym] = { price: j[id].usd, change: typeof j[id].usd_24h_change === 'number' ? j[id].usd_24h_change : null };
+    }
+  } catch (e) { console.log('[alerts] CoinGecko failed:', e.message); }
+  for (const sym of ['BTC', 'ETH']) {
+    if (out[sym]) continue;
+    try {
+      const j = await (await fetch('https://api.coinbase.com/v2/prices/' + sym + '-USD/spot', { signal: AbortSignal.timeout(15000) })).json();
+      out[sym] = { price: Number(j.data.amount), change: null };
+    } catch (e) { console.log('[alerts] Coinbase failed:', sym, e.message); }
+  }
+  console.log('[alerts] live prices:', Object.entries(out).map(([k, v]) => k + ' ' + v.price).join(', ') || 'none');
+  return out;
+}
+function fmtP(v) { return v.price >= 100 ? Math.round(v.price).toLocaleString('en-US') : v.price.toFixed(v.price < 10 ? 3 : 2); }
+function chg(v) { return v.change == null ? '' : ' (' + (v.change >= 0 ? '+' : '') + v.change.toFixed(1) + '%)'; }
+function pricesText(m) { return Object.entries(m).map(([k, v]) => k + ' ' + fmtP(v) + '
+  const now = Date.now();
+  const list = headlines.map(h => '- (' + Math.round((now - h.ts) / 60000) + ' min ago) ' + h.title + ' [' + h.source + ']').join('\n');
+  const done = sent.slice(-40).map(s => '- ' + s.title).join('\n') || '(none)';
+  return [
+    'You are the urgent-news desk of Mr_Amwal, an Arabic crypto/economy news service for Arab traders.',
+    'Fresh headlines (newest first, age in minutes, source):',
+    list,
+    '',
+    'LIVE PRICES RIGHT NOW (CoinGecko, 24h change): ' + pricesText(market),
+    'PRICE RULE (very important): these live prices are the ONLY coin prices you may write. Headlines are often hours',
+    'old: never copy a coin price from a headline. If a headline puts Bitcoin at a level that differs from the live price,',
+    'it is outdated: do not send it as a price story. Call a move sharp only if the live 24h change is at least 3%.',
+    '',
+    'Already sent to the user (the SAME event is a repeat; only a genuinely new development counts as new):',
+    done,
+    '',
+    'TASK: the user wants STRONG, important news only; the number of messages does not matter. Send every story',
+    'that is genuinely important right now (up to 3 per run). Zero is fine when nothing strong happened.',
+    'ALWAYS send these immediately when they appear in the headlines:',
+    '- Any notable Bitcoin price move: Bitcoin rising or falling sharply, breaking or losing a key level, a new',
+    '  high or low, big liquidations. Write the direction and the price/percent from the headline.',
+    '- Fed / US interest-rate decisions, Powell remarks, CPI, jobs, GDP, PCE and other key US data.',
+    '- Trump statements or decisions that can move markets (tariffs, crypto, the dollar, the Fed, China).',
+    '- Sudden breaking news: exchange hacks or collapses, big ETF flows, new US crypto laws or rulings.',
+'Topics allowed:',
+    '- Crypto: big BTC/ETH/XRP moves, major hacks, exchange news (Binance etc.), ETF flows, regulation (SEC, CFTC, Congress).',
+    '- USA: Fed decisions, key data (CPI, jobs, GDP, PCE), Congress or White House decisions that move markets.',
+    '- Trump: statements or decisions that move markets (tariffs, crypto, the dollar, the Fed).',
+    '- China: economy, tariffs, US-China relations, the yuan, crypto policy.',
+    '- Market shocks: big moves in oil, gold, the dollar, stock market crashes.',
+    'Skip: routine or weekly data (Fed balance sheet, weekly H.4.1, minor speeches), anything vague like "raises questions",',
+    'analysis, opinion pieces, price predictions, small altcoins, memecoins, ads, minor company news, sports,',
+    'and NEVER anything about Europe (ECB, EU, European countries or companies) or Israel.',
+    'FACTS: use only facts present in the headlines. Never invent numbers, names or quotes.',
+    'WRITE in Modern Standard Arabic, like a phone push notification:',
+    '- title: max 10 words, starting with one emoji (🚨 breaking, 📉/📈 price moves, 🏦 central banks or regulation,',
+    '  🔐 hacks, 💵 US data, 🇨🇳 China, 🇺🇸 Trump/Washington). Put "عاجل:" after the emoji only for truly breaking,',
+    '  market-moving news.',
+    '- body: ONE short sentence (max 25 words) with the key detail. No source line, no advice, no hashtags.',
+    'Reply with JSON only: {"items":[{"title":"...","body":"..."}]}  (use {"items":[]} when nothing qualifies)'
+  ].join('\n');
+}
+
+async function askGemini(prompt) {
+  const key = process.env.GEMINI_API_KEY;
+  if (!key) throw new Error('GEMINI_API_KEY secret is missing');
+  // Ask Google which models this key can use, so a retired model name never breaks the alerts.
+  let models = ['gemini-flash-latest', 'gemini-flash-lite-latest'];
+  try {
+    const lm = await (await fetch('https://generativelanguage.googleapis.com/v1beta/models?pageSize=200&key=' + key, { signal: AbortSignal.timeout(20000) })).json();
+    const names = (lm.models || [])
+      .filter(m => (m.supportedGenerationMethods || []).includes('generateContent'))
+      .map(m => m.name.split('/').pop())
+      .filter(n => /flash/.test(n) && !/image|tts|live|audio|embedding|exp/.test(n));
+    models = [...new Set([...models, ...names])].slice(0, 6);
+  } catch (e) { console.log('[alerts] model list failed', e.message); }
+  models = [...models, ...models.slice(0, 2)]; // busy (503) models get a second try after a pause
+  let last;
+  for (const model of models) {
+    try {
+      const r = await fetch('https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent?key=' + key, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.2, responseMimeType: 'application/json' } }),
+        signal: AbortSignal.timeout(60000)
+      });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const j = await r.json();
+      const text = (j.candidates?.[0]?.content?.parts || []).map(p => p.text || '').join('');
+      const parsed = JSON.parse(text.slice(text.indexOf('{'), text.lastIndexOf('}') + 1));
+      console.log('[alerts] model used:', model);
+      return parsed;
+    } catch (e) {
+      last = model + ': ' + e.message;
+      console.log('[alerts] model failed', last);
+      await new Promise(r => setTimeout(r, 6000));
+    }
+  }
+  throw new Error('No Gemini model worked (' + last + ')');
+}
+
+async function pick() {
+  const sent = loadState();
+  const now = Date.now();
+  const today = sent.filter(s => now - (s.ts || 0) < 24 * 3600 * 1000).length;
+  if (today >= MAX_PER_DAY) {
+    console.log('[alerts] daily cap reached (' + today + ' in 24h); sending nothing.');
+    fs.mkdirSync(path.dirname(OUT), { recursive: true });
+    fs.writeFileSync(OUT, '[]');
+    return setOutput(false);
+  }
+  const names = Object.keys(FEEDS);
+  const results = await Promise.allSettled(names.map(n => fetchFeed(n, FEEDS[n])));
+  let items = [];
+  results.forEach((r, i) => {
+    if (r.status === 'fulfilled') items.push(...r.value);
+    else console.log('[alerts] feed failed:', names[i], r.reason && r.reason.message);
+  });
+  const seen = new Set();
+  items = items
+    .filter(h => { const age = (now - h.ts) / 60000; return age >= -10 && age <= FRESH_MIN && !banned(h.title); })
+    .sort((a, b) => b.ts - a.ts)
+    .filter(h => { const k = h.title.toLowerCase().slice(0, 70); if (seen.has(k)) return false; seen.add(k); return true; })
+    .slice(0, 60);
+  console.log('[alerts] fresh headlines (last ' + FRESH_MIN + ' min):', items.length);
+  fs.mkdirSync(path.dirname(OUT), { recursive: true });
+  if (!items.length) { fs.writeFileSync(OUT, '[]'); return setOutput(false); }
+
+  const market = await livePrices();
+  const res = await askGemini(buildPrompt(items, sent, market));
+  const oldTitles = sent.map(s => s.title);
+  const picked = [];
+  for (const x of (res && res.items) || []) {
+    if (!x || !x.title || !x.body) continue;
+    if (banned(x.title + ' ' + x.body)) { console.log('[alerts] skipped (Europe/Israel rule):', x.title); continue; }
+    const dup = isRepeat(x.title, oldTitles.concat(picked.map(p => p.title)));
+    if (dup) { console.log('[alerts] skipped as repeat of:', dup); continue; }
+    const bad = priceProblem(x, market);
+    if (bad) { console.log('[alerts] skipped (wrong/old price):', x.title, '-', bad); continue; }
+    let body = String(x.body).trim();
+    if (market.BTC && /بيتكوين|بتكوين|bitcoin|BTC/i.test(x.title + ' ' + body)) body += '\nBTC ' + fmtP(market.BTC) + '
+    if (picked.length >= MAX_ITEMS) break;
+  }
+  fs.writeFileSync(OUT, JSON.stringify(picked, null, 2));
+  console.log('[alerts] picked:', picked.length ? picked.map(p => p.title).join(' | ') : 'nothing new');
+  setOutput(picked.length > 0);
+}
+
+async function send() {
+  const picked = JSON.parse(fs.readFileSync(OUT, 'utf8'));
+  if (!picked.length) return;
+  const wa = require('./send');
+  const sent = loadState();
+  for (const it of picked) {
+    await wa.sendToSelf({ text: '*' + it.title + '*\n' + it.body });
+    sent.push({ title: it.title, ts: Date.now() });
+    saveState(sent);
+  }
+  console.log('[alerts] sent', picked.length, 'message(s)');
+}
+
+(async () => {
+  const mode = process.argv[2] || 'pick';
+  try {
+    if (mode === 'send') await send(); else await pick();
+    process.exit(0);
+  } catch (e) {
+    console.error('FAILED:', e.message);
+    if (mode !== 'send') setOutput(false);
+    process.exit(mode === 'send' ? 1 : 0);
+  }
+})();
+ + chg(v)).join(' · ') || '(unavailable)'; }
+
+// Rejects an alert whose Bitcoin figure is not the live price, or that calls a sharp move the live 24h change does not show.
+function priceProblem(x, m) {
+  const btc = m.BTC;
+  const txt = x.title + ' ' + x.body;
+  if (!btc || !/بيتكوين|بتكوين|bitcoin|BTC/i.test(txt)) return null;
+  const nums = (txt.match(/\d{1,3}(?:[,٬]\d{3})+|\d{5,6}/g) || []).map(v => Number(v.replace(/[,٬]/g, '')));
+  for (const k of (txt.match(/\d{2,3}(?:[.,]\d)?\s*ألف/g) || [])) nums.push(Math.round(parseFloat(k.replace(',', '.')) * 1000));
+  for (const n of nums.filter(n => n >= 10000 && n <= 300000)) {
+    if (Math.abs(n - btc.price) / btc.price > 0.04) return 'BTC figure ' + n + ' but live price is ' + Math.round(btc.price);
+  }
+  if (btc.change != null && Math.abs(btc.change) < 2.5 && /بشدة|حاد|حادة|انهيار|تنهار|ينهار|تقفز|يقفز|قفزة|بقوة/.test(x.title)) {
+    return 'calls a sharp move but live 24h change is ' + btc.change.toFixed(1) + '%';
+  }
+  return null;
+}
+
+function buildPrompt(headlines, sent, market = {}) {
+  const now = Date.now();
+  const list = headlines.map(h => '- (' + Math.round((now - h.ts) / 60000) + ' min ago) ' + h.title + ' [' + h.source + ']').join('\n');
+  const done = sent.slice(-40).map(s => '- ' + s.title).join('\n') || '(none)';
+  return [
+    'You are the urgent-news desk of Mr_Amwal, an Arabic crypto/economy news service for Arab traders.',
+    'Fresh headlines (newest first, age in minutes, source):',
+    list,
+    '',
+    'Already sent to the user (the SAME event is a repeat; only a genuinely new development counts as new):',
+    done,
+    '',
+    'TASK: the user wants STRONG, important news only; the number of messages does not matter. Send every story',
+    'that is genuinely important right now (up to 3 per run). Zero is fine when nothing strong happened.',
+    'ALWAYS send these immediately when they appear in the headlines:',
+    '- Any notable Bitcoin price move: Bitcoin rising or falling sharply, breaking or losing a key level, a new',
+    '  high or low, big liquidations. Write the direction and the price/percent from the headline.',
+    '- Fed / US interest-rate decisions, Powell remarks, CPI, jobs, GDP, PCE and other key US data.',
+    '- Trump statements or decisions that can move markets (tariffs, crypto, the dollar, the Fed, China).',
+    '- Sudden breaking news: exchange hacks or collapses, big ETF flows, new US crypto laws or rulings.',
+'Topics allowed:',
+    '- Crypto: big BTC/ETH/XRP moves, major hacks, exchange news (Binance etc.), ETF flows, regulation (SEC, CFTC, Congress).',
+    '- USA: Fed decisions, key data (CPI, jobs, GDP, PCE), Congress or White House decisions that move markets.',
+    '- Trump: statements or decisions that move markets (tariffs, crypto, the dollar, the Fed).',
+    '- China: economy, tariffs, US-China relations, the yuan, crypto policy.',
+    '- Market shocks: big moves in oil, gold, the dollar, stock market crashes.',
+    'Skip: routine or weekly data (Fed balance sheet, weekly H.4.1, minor speeches), anything vague like "raises questions",',
+    'analysis, opinion pieces, price predictions, small altcoins, memecoins, ads, minor company news, sports,',
+    'and NEVER anything about Europe (ECB, EU, European countries or companies) or Israel.',
+    'FACTS: use only facts present in the headlines. Never invent numbers, names or quotes.',
+    'WRITE in Modern Standard Arabic, like a phone push notification:',
+    '- title: max 10 words, starting with one emoji (🚨 breaking, 📉/📈 price moves, 🏦 central banks or regulation,',
+    '  🔐 hacks, 💵 US data, 🇨🇳 China, 🇺🇸 Trump/Washington). Put "عاجل:" after the emoji only for truly breaking,',
+    '  market-moving news.',
+    '- body: ONE short sentence (max 25 words) with the key detail. No source line, no advice, no hashtags.',
+    'Reply with JSON only: {"items":[{"title":"...","body":"..."}]}  (use {"items":[]} when nothing qualifies)'
+  ].join('\n');
+}
+
+async function askGemini(prompt) {
+  const key = process.env.GEMINI_API_KEY;
+  if (!key) throw new Error('GEMINI_API_KEY secret is missing');
+  // Ask Google which models this key can use, so a retired model name never breaks the alerts.
+  let models = ['gemini-flash-latest', 'gemini-flash-lite-latest'];
+  try {
+    const lm = await (await fetch('https://generativelanguage.googleapis.com/v1beta/models?pageSize=200&key=' + key, { signal: AbortSignal.timeout(20000) })).json();
+    const names = (lm.models || [])
+      .filter(m => (m.supportedGenerationMethods || []).includes('generateContent'))
+      .map(m => m.name.split('/').pop())
+      .filter(n => /flash/.test(n) && !/image|tts|live|audio|embedding|exp/.test(n));
+    models = [...new Set([...models, ...names])].slice(0, 6);
+  } catch (e) { console.log('[alerts] model list failed', e.message); }
+  models = [...models, ...models.slice(0, 2)]; // busy (503) models get a second try after a pause
+  let last;
+  for (const model of models) {
+    try {
+      const r = await fetch('https://generativelanguage.googleapis.com/v1beta/models/' + model + ':generateContent?key=' + key, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.2, responseMimeType: 'application/json' } }),
+        signal: AbortSignal.timeout(60000)
+      });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const j = await r.json();
+      const text = (j.candidates?.[0]?.content?.parts || []).map(p => p.text || '').join('');
+      const parsed = JSON.parse(text.slice(text.indexOf('{'), text.lastIndexOf('}') + 1));
+      console.log('[alerts] model used:', model);
+      return parsed;
+    } catch (e) {
+      last = model + ': ' + e.message;
+      console.log('[alerts] model failed', last);
+      await new Promise(r => setTimeout(r, 6000));
+    }
+  }
+  throw new Error('No Gemini model worked (' + last + ')');
+}
+
+async function pick() {
+  const sent = loadState();
+  const now = Date.now();
+  const today = sent.filter(s => now - (s.ts || 0) < 24 * 3600 * 1000).length;
+  if (today >= MAX_PER_DAY) {
+    console.log('[alerts] daily cap reached (' + today + ' in 24h); sending nothing.');
+    fs.mkdirSync(path.dirname(OUT), { recursive: true });
+    fs.writeFileSync(OUT, '[]');
+    return setOutput(false);
+  }
+  const names = Object.keys(FEEDS);
+  const results = await Promise.allSettled(names.map(n => fetchFeed(n, FEEDS[n])));
+  let items = [];
+  results.forEach((r, i) => {
+    if (r.status === 'fulfilled') items.push(...r.value);
+    else console.log('[alerts] feed failed:', names[i], r.reason && r.reason.message);
+  });
+  const seen = new Set();
+  items = items
+    .filter(h => { const age = (now - h.ts) / 60000; return age >= -10 && age <= FRESH_MIN && !banned(h.title); })
+    .sort((a, b) => b.ts - a.ts)
+    .filter(h => { const k = h.title.toLowerCase().slice(0, 70); if (seen.has(k)) return false; seen.add(k); return true; })
+    .slice(0, 60);
+  console.log('[alerts] fresh headlines (last ' + FRESH_MIN + ' min):', items.length);
+  fs.mkdirSync(path.dirname(OUT), { recursive: true });
+  if (!items.length) { fs.writeFileSync(OUT, '[]'); return setOutput(false); }
+
+  const res = await askGemini(buildPrompt(items, sent));
+  const oldTitles = sent.map(s => s.title);
+  const picked = [];
+  for (const x of (res && res.items) || []) {
+    if (!x || !x.title || !x.body) continue;
+    if (banned(x.title + ' ' + x.body)) { console.log('[alerts] skipped (Europe/Israel rule):', x.title); continue; }
+    const dup = isRepeat(x.title, oldTitles.concat(picked.map(p => p.title)));
+    if (dup) { console.log('[alerts] skipped as repeat of:', dup); continue; }
+    picked.push({ title: String(x.title).trim(), body: String(x.body).trim() });
+    if (picked.length >= MAX_ITEMS) break;
+  }
+  fs.writeFileSync(OUT, JSON.stringify(picked, null, 2));
+  console.log('[alerts] picked:', picked.length ? picked.map(p => p.title).join(' | ') : 'nothing new');
+  setOutput(picked.length > 0);
+}
+
+async function send() {
+  const picked = JSON.parse(fs.readFileSync(OUT, 'utf8'));
+  if (!picked.length) return;
+  const wa = require('./send');
+  const sent = loadState();
+  for (const it of picked) {
+    await wa.sendToSelf({ text: '*' + it.title + '*\n' + it.body });
+    sent.push({ title: it.title, ts: Date.now() });
+    saveState(sent);
+  }
+  console.log('[alerts] sent', picked.length, 'message(s)');
+}
+
+(async () => {
+  const mode = process.argv[2] || 'pick';
+  try {
+    if (mode === 'send') await send(); else await pick();
+    process.exit(0);
+  } catch (e) {
+    console.error('FAILED:', e.message);
+    if (mode !== 'send') setOutput(false);
+    process.exit(mode === 'send' ? 1 : 0);
+  }
+})();
+ + chg(market.BTC);
+    picked.push({ title: String(x.title).trim(), body });
+    if (picked.length >= MAX_ITEMS) break;
+  }
+  fs.writeFileSync(OUT, JSON.stringify(picked, null, 2));
+  console.log('[alerts] picked:', picked.length ? picked.map(p => p.title).join(' | ') : 'nothing new');
+  setOutput(picked.length > 0);
+}
+
+async function send() {
+  const picked = JSON.parse(fs.readFileSync(OUT, 'utf8'));
+  if (!picked.length) return;
+  const wa = require('./send');
+  const sent = loadState();
+  for (const it of picked) {
+    await wa.sendToSelf({ text: '*' + it.title + '*\n' + it.body });
+    sent.push({ title: it.title, ts: Date.now() });
+    saveState(sent);
+  }
+  console.log('[alerts] sent', picked.length, 'message(s)');
+}
+
+(async () => {
+  const mode = process.argv[2] || 'pick';
+  try {
+    if (mode === 'send') await send(); else await pick();
+    process.exit(0);
+  } catch (e) {
+    console.error('FAILED:', e.message);
+    if (mode !== 'send') setOutput(false);
+    process.exit(mode === 'send' ? 1 : 0);
+  }
+})();
+ + chg(v)).join(' · ') || '(unavailable)'; }
+
+// Rejects an alert whose Bitcoin figure is not the live price, or that calls a sharp move the live 24h change does not show.
+function priceProblem(x, m) {
+  const btc = m.BTC;
+  const txt = x.title + ' ' + x.body;
+  if (!btc || !/بيتكوين|بتكوين|bitcoin|BTC/i.test(txt)) return null;
+  const nums = (txt.match(/\d{1,3}(?:[,٬]\d{3})+|\d{5,6}/g) || []).map(v => Number(v.replace(/[,٬]/g, '')));
+  for (const k of (txt.match(/\d{2,3}(?:[.,]\d)?\s*ألف/g) || [])) nums.push(Math.round(parseFloat(k.replace(',', '.')) * 1000));
+  for (const n of nums.filter(n => n >= 10000 && n <= 300000)) {
+    if (Math.abs(n - btc.price) / btc.price > 0.04) return 'BTC figure ' + n + ' but live price is ' + Math.round(btc.price);
+  }
+  if (btc.change != null && Math.abs(btc.change) < 2.5 && /بشدة|حاد|حادة|انهيار|تنهار|ينهار|تقفز|يقفز|قفزة|بقوة/.test(x.title)) {
+    return 'calls a sharp move but live 24h change is ' + btc.change.toFixed(1) + '%';
+  }
+  return null;
+}
+
+function buildPrompt(headlines, sent, market = {}) {
   const now = Date.now();
   const list = headlines.map(h => '- (' + Math.round((now - h.ts) / 60000) + ' min ago) ' + h.title + ' [' + h.source + ']').join('\n');
   const done = sent.slice(-40).map(s => '- ' + s.title).join('\n') || '(none)';
