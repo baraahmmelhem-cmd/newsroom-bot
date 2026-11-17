@@ -96,7 +96,13 @@ def fetch_headlines():
     from datetime import datetime, timezone
     now = datetime.now(timezone.utc)
     items = []
+    try:  # feeds the morning source check found dead or stale (scripts/health.py) are skipped today
+        dead = set(json.loads((Path(__file__).resolve().parent.parent / "feeds_status.json").read_text(encoding="utf-8")).get("dead", []))
+    except Exception:
+        dead = set()
     for name, url in FEEDS.items():
+        if name in dead:
+            continue
         try:
             r = requests.get(url, timeout=30, headers={"User-Agent": "Mozilla/5.0 newsroom-bot"})
             r.raise_for_status()
