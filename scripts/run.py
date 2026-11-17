@@ -376,6 +376,24 @@ def whatsapp(item):
         time.sleep(5 * (attempt + 1))
 
 
+def btc_price_wrong(item, btc_line):
+    """Headlines are often hours old: reject an item whose Bitcoin figure is not the live price."""
+    import re
+    m = re.search(r"\$([\d,]+)", btc_line or "")
+    if not m:
+        return None
+    live = float(m.group(1).replace(",", ""))
+    txt = item.get("title", "") + " " + item.get("body", "")
+    if not re.search(r"بيتكوين|بتكوين|bitcoin|BTC", txt, re.I):
+        return None
+    nums = [float(x.replace(",", "").replace("٬", "")) for x in re.findall(r"\d{1,3}(?:[,٬]\d{3})+|\d{5,6}", txt)]
+    nums += [float(x.replace(",", ".")) * 1000 for x in re.findall(r"(\d{2,3}(?:[.,]\d)?)\s*ألف", txt)]
+    for n in nums:
+        if 10000 <= n <= 300000 and abs(n - live) / live > 0.04:
+            return f"BTC figure {n:,.0f} but live price is {live:,.0f}"
+    return None
+
+
 def site_titles():
     """Titles already live on the newsroom (including items the owner posted by hand), so nothing is repeated."""
     import re, html as _html
@@ -443,6 +461,10 @@ def main():
             item["category"] = "كريبتو" if any(k in txt for k in ("بيتكوين", "كريبتو", "العملات", "إيثريوم", "ETF", "BTC", "ETH")) else "اقتصاد"
         item["title"] = item.get("title", "").replace("عاجل:", "").replace("عاجل :", "").replace("  ", " ").strip()
         item["hot"] = False
+    bad = btc_price_wrong(item, btc)
+    if bad:
+        print("Skipped (wrong/old Bitcoin price):", item.get("title"), "-", bad)
+        return
     dup = is_repeat(item.get("title", ""), posted)
     if dup:
         print("Repeat of:", dup, "- asking once more for a different story.", flush=True)
