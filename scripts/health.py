@@ -115,7 +115,7 @@ def main():
             lines.append(f"⚠️ {sym}: مصدر سعر واحد فقط يعمل ({', '.join(vals) or 'لا شيء'})")
     text = "\n".join(lines)
     print(text)
-    send_owner(text)
+    # Internal check only (owner, 17 Nov): nothing is ever sent to the private number.
 
 
 if __name__ == "__main__":
