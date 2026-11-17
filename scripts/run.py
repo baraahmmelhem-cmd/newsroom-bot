@@ -124,28 +124,63 @@ def fetch_headlines():
             print(f"Feed failed: {name}: {e}")
     items.sort()
     print(f"Fresh headlines (last {FRESH_HOURS}h):", len(items), flush=True)
-    return "\n".join(row for _, row in items[:40])
+    return "\n".join(f"[{i + 1}] " + row[2:] for i, (_, row) in enumerate(items[:40]))
 
 
 def live_btc():
-    """Current BTC price and 24h change (CoinGecko, then Coinbase as backup)."""
+    """Bitcoin price verified by at least two of CoinGecko, Coinbase and Kraken (within 1%); the median of those."""
+    quotes, change = {}, None
     try:
         r = requests.get("https://api.coingecko.com/api/v3/simple/price",
-                         params={"ids": "bitcoin", "vs_currencies": "usd",
-                                 "include_24hr_change": "true"}, timeout=20)
+                         params={"ids": "bitcoin", "vs_currencies": "usd", "include_24hr_change": "true"}, timeout=20)
         r.raise_for_status()
         d = r.json()["bitcoin"]
-        return f"BTC now ${d['usd']:,.0f} ({d['usd_24h_change']:+.1f}% in 24h, CoinGecko)"
+        quotes["CoinGecko"], change = float(d["usd"]), d.get("usd_24h_change")
     except Exception as e:
         print("CoinGecko failed:", e)
     try:
         r = requests.get("https://api.coinbase.com/v2/prices/BTC-USD/spot", timeout=20)
         r.raise_for_status()
-        return f"BTC now ${float(r.json()['data']['amount']):,.0f} (Coinbase spot)"
+        quotes["Coinbase"] = float(r.json()["data"]["amount"])
     except Exception as e:
         print("Coinbase failed:", e)
-    return None
+    try:
+        r = requests.get("https://api.kraken.com/0/public/Ticker", params={"pair": "XBTUSD"}, timeout=20)
+        r.raise_for_status()
+        quotes["Kraken"] = float(list(r.json()["result"].values())[0]["c"][0])
+    except Exception as e:
+        print("Kraken failed:", e)
 
+    def median(v):
+        v = sorted(v)
+        n = len(v)
+        return v[n // 2] if n % 2 else (v[n // 2 - 1] + v[n // 2]) / 2
+
+    if len(quotes) < 2:
+        print("BTC price not verified (fewer than 2 sources):", quotes)
+        return None
+    mid = median(quotes.values())
+    agree = {k: v for k, v in quotes.items() if abs(v - mid) / mid <= 0.01}
+    if len(agree) < 2:
+        print("BTC price not verified (sources disagree):", quotes)
+        return None
+    price = median(agree.values())
+    if "CoinGecko" not in agree:
+        change = None
+    ch = f"{change:+.1f}% in 24h, " if isinstance(change, (int, float)) else ""
+    return f"BTC now ${price:,.0f} ({ch}verified: {' + '.join(agree)})"
+
+
+def confirmed_outlets(item, headlines):
+    """Owner rule (17 Nov): publish only when at least two different outlets report the story."""
+    import re
+    src = {}
+    for line in (headlines or "").splitlines():
+        m = re.match(r"^\[(\d+)\].*\[([^\]]+)\]\s*$", line)
+        if m:
+            src[int(m.group(1))] = m.group(2).strip().lower()
+    refs = item.get("refs") or []
+    return {src[int(r)] for r in refs if str(r).strip().isdigit() and int(r) in src}
 
 UP = ("ارتفاع", "يرتفع", "ترتفع", "ترتد", "يرتد", "تتجاوز", "يتجاوز", "متجاوز", "تقفز", "يقفز",
       "قفز", "تعاف", "يتعافى", "صعود", "تصعد", "يصعد", "تستعيد", "يستعيد", "مكاسب")
@@ -223,6 +258,9 @@ tariffs/economy/crypto, US-China, Russia (when market-moving), oil/gold/dollar/T
 stocks and crypto. Pick the single story with the BIGGEST market impact right now. NEVER pick anything about Europe
 (ECB, Lagarde, EU, eurozone, European countries or companies) or Israel; skip those entirely.
 
+CONFIRMATION RULE (owner, very important): choose a story ONLY if at least TWO different outlets in the list
+report the same event, and put the [numbers] of ALL those headlines in "refs". A story from one outlet only is not
+published.
 FACTS: use ONLY facts present in the headlines and their summaries above (the text after " — "). Never invent numbers, names or quotes.
 If a detail is not in the headlines, leave it out.
 
@@ -246,7 +284,7 @@ one item every 2 hours, so each one must be the most important market story of t
   repeat even if worded differently. Never publish the same event twice.
 
 Reply with JSON only, no markdown fences:
-{{"skip": false, "title": "...", "body": "...", "category": "كريبتو|اقتصاد|عاجل|تنبيه", "hot": false}}
+{{"skip": false, "title": "...", "body": "...", "category": "كريبتو|اقتصاد|عاجل|تنبيه", "hot": false, "refs": [1, 5]}}
 Set "hot": true ONLY for truly urgent, market-moving news (major exchange hack, Fed decision,
 big US data release); otherwise false.
 If every strong story is already published, reply {{"skip": true}}."""
@@ -488,6 +526,14 @@ def main():
         if dup:
             print("Skipped as repeat of:", dup)
             return
+    outs = confirmed_outlets(item, headlines)
+    if len(outs) < 2:
+        print("Skipped (not confirmed by 2 outlets):", item.get("title"), sorted(outs))
+        return
+    bad = btc_price_wrong(item, btc)
+    if bad:
+        print("Skipped (Bitcoin price not verified):", item.get("title"), "-", bad)
+        return
     publish(item)
     whatsapp(item)
     posted.append(item["title"])
