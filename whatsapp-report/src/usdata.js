@@ -15,7 +15,7 @@ const OUT = path.join(ROOT, 'out', 'usdata.json');
 const STATE = path.join(ROOT, 'usdata-state.json');
 const FEED = 'https://nfs.faireconomy.media/ff_calendar_thisweek.json';
 const SHOW_OFFSET_H = 4;            // times shown in Dubai time
-const REMIND_BEFORE_MIN = 65;       // remind when a release is at most this far away
+const REMIND_BEFORE_MIN = 35;       // remind when a release is at most this far away
 const RESULT_WINDOW_MIN = 6 * 60;   // look for the result up to 6 hours after release
 const SITE = 'https://www.mr-amwal.com';
 const UA = { 'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120 Safari/537.36' };
@@ -248,10 +248,19 @@ async function live() {
   const state = loadState();
   state.reminded = state.reminded || {}; state.done = state.done || {};
   const now = Date.now();
-  const groups = (await loadEvents()).filter(g => g.d.getTime() > now - 10 * 60000 && g.d.getTime() - now <= 45 * 60000 && !state.done[g.key]);
-  if (!groups.length) { console.log('[usdata] live: no release within the next 45 minutes'); return; }
+  const groups = (await loadEvents()).filter(g => g.d.getTime() > now - 10 * 60000 && g.d.getTime() - now <= 70 * 60000 && !state.done[g.key]);
+  if (!groups.length) { console.log('[usdata] live: no release within the next 70 minutes'); return; }
   const wa = require('./send');
   for (const g of groups) {
+    // Reminder exactly ~30 minutes before the release (owner rule), if it was not sent yet.
+    if (!state.reminded[g.key] && g.d.getTime() > Date.now()) {
+      const untilRemind = g.d.getTime() - 30 * 60000 - Date.now();
+      if (untilRemind > 0) { console.log('[usdata] live: reminder in', Math.round(untilRemind / 1000), 's for', g.key); await sleep(untilRemind); }
+      await wa.sendToSelf({ text: reminderText(g, new Date()) });
+      state.reminded[g.key] = Date.now();
+      saveState(state);
+      console.log('[usdata] live: reminder sent for', g.key);
+    }
     const wait = g.d.getTime() + 90000 - Date.now();
     console.log('[usdata] live: waiting', Math.max(0, Math.round(wait / 1000)), 's for the release at', g.key);
     if (wait > 0) await sleep(wait);
