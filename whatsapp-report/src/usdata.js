@@ -159,6 +159,7 @@ function resultPrompt(g, heads, top) {
     '',
     'TASK: find the ACTUAL released value of each release, using ONLY these headlines.',
     'If the headlines do not clearly state the actual numbers yet, reply {"found": false}.',
+    'Use a value ONLY if at least TWO different headlines (different outlets) state the same number; otherwise reply {"found": false}.',
     'Never guess or invent a number. For a Fed decision the actual is the new rate range or "unchanged".',
     'Reply JSON only:',
     '{"found": true, "actuals": {"<exact release title>": "<value as in the headline, e.g. 0.3% or 175K>"},',
