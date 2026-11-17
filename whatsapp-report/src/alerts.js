@@ -154,8 +154,8 @@ function buildPrompt(headlines, sent, market = {}) {
     'Already sent to the user (the SAME event is a repeat; only a genuinely new development counts as new):',
     done,
     '',
-    'TASK: the user wants STRONG, important news only; the number of messages does not matter. Send every story',
-    'that is genuinely important right now (up to 3 per run). Zero is fine when nothing strong happened.',
+    'TASK: send EVERY HOUR at least ONE story: the strongest market story in the list that is confirmed by two outlets',
+    'and is not a repeat, plus any other genuinely strong stories (up to 3 per run). Never leave a strong story out.',
     'ALWAYS send these immediately when they appear in the headlines:',
     '- Any notable Bitcoin price move: Bitcoin rising or falling sharply, breaking or losing a key level, a new',
     '  high or low, big liquidations. Write the direction and the price/percent from the headline.',
@@ -173,9 +173,8 @@ function buildPrompt(headlines, sent, market = {}) {
     'and NEVER anything about Europe (ECB, EU, European countries or companies) or Israel.',
     'FACTS: use only facts present in the headlines. Never invent numbers, names or quotes.',
     'WRITE in Modern Standard Arabic, like a phone push notification:',
-    '- title: max 10 words, starting with one emoji (🚨 breaking, 📉/📈 price moves, 🏦 central banks or regulation,',
-    '  🔐 hacks, 💵 US data, 🇨🇳 China, 🇺🇸 Trump/Washington). Put "عاجل:" after the emoji only for truly breaking,',
-    '  market-moving news.',
+    '- title: max 10 words, starting with one emoji (📉/📈 price moves, 🏦 central banks or regulation,',
+    '  🔐 hacks, 💵 US data, 🇨🇳 China, 🇺🇸 Trump/Washington). Never write "عاجل" and never use the 🚨 emoji.',
     '- body: ONE short sentence (max 25 words) with the key detail. No source line, no advice, no hashtags.',
     'Reply with JSON only: {"items":[{"title":"...","body":"...","refs":[1,7]}]}  (use {"items":[]} when nothing qualifies)'
   ].join('\n');
@@ -247,10 +246,15 @@ async function pick() {
   if (!items.length) { fs.writeFileSync(OUT, '[]'); return setOutput(false); }
 
   const market = await livePrices();
-  const res = await askGemini(buildPrompt(items, sent, market));
   const oldTitles = sent.map(s => s.title);
   const picked = [];
+  const tried = [];
+  // Owner rule (17 Nov): one confirmed story every hour. If round 1 gives nothing that passes the checks, ask once more.
+  for (let round = 1; round <= 2 && !picked.length; round++) {
+  const extra = round === 1 ? '' : '\nIMPORTANT: none of your earlier picks passed the checks (' + (tried.join(' | ') || 'none') + '). Choose the next-best story that IS reported by at least two different outlets in the list and is not a repeat; use {"items":[]} only if truly nothing qualifies.';
+  const res = await askGemini(buildPrompt(items, sent, market) + extra);
   for (const x of (res && res.items) || []) {
+    if (x && x.title) tried.push(String(x.title));
     if (!x || !x.title || !x.body) continue;
     if (banned(x.title + ' ' + x.body)) { console.log('[alerts] skipped (Europe/Israel rule):', x.title); continue; }
     const dup = isRepeat(x.title, oldTitles.concat(picked.map(p => p.title)));
@@ -262,8 +266,9 @@ async function pick() {
     if (bad) { console.log('[alerts] skipped (price not verified):', x.title, '-', bad); continue; }
     let body = String(x.body).trim();
     if (market.BTC && /بيتكوين|بتكوين|bitcoin|BTC/i.test(x.title + ' ' + body)) body += '\nBTC ' + fmtP(market.BTC) + '$' + chg(market.BTC);
-    picked.push({ title: String(x.title).trim(), body });
+    picked.push({ title: String(x.title).replace(/🚨\s*/g, '').replace(/عاجل\s*[:：]?\s*/g, '').replace(/\s+/g, ' ').trim(), body });
     if (picked.length >= MAX_ITEMS) break;
+  }
   }
   fs.writeFileSync(OUT, JSON.stringify(picked, null, 2));
   console.log('[alerts] picked:', picked.length ? picked.map(p => p.title).join(' | ') : 'nothing new');
