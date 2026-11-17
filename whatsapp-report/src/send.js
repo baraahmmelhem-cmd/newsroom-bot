@@ -170,8 +170,8 @@ async function greenTarget() {
     } catch (e) { /* keep looking */ }
     await delay(400);
   }
-  console.log('[green] group not found; sending to the owner number instead');
-  return (_target = phoneDigits() + '@c.us');
+  // Owner rule (17 Nov): never send to the private number. If the group cannot be found, send nothing.
+  throw new Error('WhatsApp group not found; nothing sent (never to the private number)');
 }
 
 function greenOn() { return !!process.env.GREENAPI_API_TOKEN; }
