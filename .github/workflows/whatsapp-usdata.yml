@@ -16,7 +16,7 @@ concurrency:
 jobs:
   watch:
     runs-on: ubuntu-latest
-    timeout-minutes: 55
+    timeout-minutes: 100
     env:
       WHATSAPP_PHONE: ${{ secrets.WHATSAPP_PHONE }}
       SESSION_KEY: ${{ secrets.SESSION_KEY }}
@@ -57,7 +57,7 @@ jobs:
         if: steps.pick.outputs.found == 'true'
         run: node src/usdata.js send
 
-      - name: Live result (waits for a release due within 45 min, sends it the moment it is out)
+      - name: Live (reminder 30 min before a release due within 70 min, then the result the moment it is out)
         run: node src/usdata.js live
 
       - name: Save session and state
