@@ -452,7 +452,6 @@ def main():
     item = write_item(headlines, posted, btc)
     if item.get("skip"):
         print("Model skipped in a daily slot; asking once more.", flush=True)
-        import time
         time.sleep(8)
         item = write_item(headlines, posted, btc)
     if item.get("skip"):
