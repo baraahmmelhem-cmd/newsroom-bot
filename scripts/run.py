@@ -132,6 +132,10 @@ def fetch_headlines():
         except Exception as e:  # keep going with the other feeds
             print(f"Feed failed: {name}: {e}")
     items.sort()
+    # Owner 18 Nov: 450 headlines made the model skip. Keep every Al Jazeera item plus the newest others, max 150 in all.
+    aj = [x for x in items if "[Al Jazeera" in x[1]]
+    rest = [x for x in items if "[Al Jazeera" not in x[1]]
+    items = sorted(aj + rest[:max(0, 150 - len(aj))])
     print(f"Fresh headlines (last {FRESH_HOURS}h):", len(items), flush=True)
     return "\n".join(f"[{i + 1}] " + row[2:] for i, (_, row) in enumerate(items[:40]))
 
