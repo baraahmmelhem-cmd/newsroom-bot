@@ -271,7 +271,8 @@ never publish a story that contradicts the current BTC direction in the headline
 "BTC falls/drops" when the latest headlines show it rising, and vice versa). If an older published
 item is now outdated, write the new development as an update ("يرتد", "يتعافى") instead.
 SCOPE: crypto stories AND major market-moving US/global-economy stories: Fed and US data, Trump decisions on
-tariffs/economy/crypto, US-China, Russia (when market-moving), oil/gold/dollar/Treasury-yield shocks, AI news (US/China AI, AI chips, AI laws), big tech news (Apple, Google, Microsoft, Nvidia, Meta, Amazon, Tesla, OpenAI: major outages, CEO changes,
+tariffs/economy/crypto, US-China, Russia (when market-moving), oil/gold/dollar/Treasury-yield shocks, coin prices ONLY for the owner's halal coins (Bitcoin, Ethereum, XRP, Solana, Stellar XLM, BNB) and never stories about
+other coins or memecoins, AI news (US/China AI, AI chips, AI laws), big tech news (Apple, Google, Microsoft, Nvidia, Meta, Amazon, Tesla, OpenAI: major outages, CEO changes,
 big launches, lawsuits, earnings shocks), payments news (Apple Pay, Google Pay, Visa, Mastercard, PayPal, Stripe,
 stablecoin or crypto payments, new ways to buy or pay with bitcoin), and shock events at mega-cap companies that move
 stocks and crypto. Pick the single story with the BIGGEST market impact right now. NEVER pick anything about Europe
