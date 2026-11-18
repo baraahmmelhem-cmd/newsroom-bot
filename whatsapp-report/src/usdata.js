@@ -161,6 +161,7 @@ function resultPrompt(g, heads, top) {
     'If the headlines do not clearly state the actual numbers yet, reply {"found": false}.',
     'Use a value ONLY if at least TWO different headlines (different outlets) state the same number; otherwise reply {"found": false}.',
     'Never guess or invent a number. For a Fed decision the actual is the new rate range or "unchanged".',
+'For FOMC minutes or a speech (no number): the actual is the main message in a few Arabic words (for example: ميل لرفع الفائدة); found is true once two different headlines report what the minutes said.',
     'Reply JSON only:',
     '{"found": true, "actuals": {"<exact release title>": "<value as in the headline, e.g. 0.3% or 175K>"},',
     ' "meaning": "<one Arabic sentence (max 30 words): higher/lower than expected and what it means for the dollar, rates and bitcoin>"' +
