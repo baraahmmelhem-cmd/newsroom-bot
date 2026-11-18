@@ -260,7 +260,7 @@ async function pick() {
     .filter(h => { const age = (now - h.ts) / 60000; return age >= -10 && age <= FRESH_MIN && !banned(h.title); })
     .sort((a, b) => b.ts - a.ts)
     .filter(h => { const k = h.title.toLowerCase().slice(0, 70); if (seen.has(k)) return false; seen.add(k); return true; })
-    .slice(0, 60);
+    .filter((h, i) => i < 60 || /^Al Jazeera/.test(h.source));
   console.log('[alerts] fresh headlines (last ' + FRESH_MIN + ' min):', items.length);
   fs.mkdirSync(path.dirname(OUT), { recursive: true });
   if (!items.length) { fs.writeFileSync(OUT, '[]'); return setOutput(false); }
@@ -297,7 +297,21 @@ if (/\b(ADA|KAVA|DOGE|SHIB|PEPE|LTC|AVAX|TRX|TON|LINK|SUI|HYPE|ZEC|XMR|BCH|DOT|M
     if (picked.length >= MAX_ITEMS) break;
   }
   }
-  fs.writeFileSync(OUT, JSON.stringify(picked, null, 2));
+  // Owner rule 18 Nov: every fresh Al Jazeera Arabic headline on our topics goes out, even if the model did not pick it
+// (currencies, gold, silver, oil, Wall Street, the Fed, crypto, big tech, AI, payments). Repeats and Europe/Israel are still skipped.
+const AJ_TOPIC = /بيتكوين|بتكوين|العملات|كريبتو|إيثيريوم|إيثريوم|الذهب|ذهب|الفضة|النفط|نفط|برنت|الخام|وول ستريت|الأسهم الأمريكية|داو جونز|ناسداك|الفدرالي|الفيدرالي|الاحتياطي الاتحادي|باول|الفائدة|الدولار|إنفيديا|أبل|آبل|غوغل|مايكروسوفت|ميتا|أمازون|تسلا|أوبن إيه آي|أنثروبيك|الذكاء الاصطناعي|فيزا|ماستركارد|باي بال|المدفوعات|هرمز/;
+const ajIcon = t => /ذهب|الفضة/.test(t) ? '🪙' : /نفط|برنت|الخام|هرمز/.test(t) ? '🛢️' : /وول ستريت|الأسهم|داو جونز|ناسداك/.test(t) ? '📊' : /الفدرالي|الفيدرالي|الاحتياطي|باول|الفائدة/.test(t) ? '🏦' : /بيتكوين|بتكوين|كريبتو|إيثيريوم|إيثريوم|المشفرة|الرقمية/.test(t) ? '💰' : /الذكاء الاصطناعي|إنفيديا|أبل|آبل|غوغل|مايكروسوفت|ميتا|أمازون|تسلا|أوبن|أنثروبيك/.test(t) ? '💻' : /فيزا|ماستركارد|باي بال|المدفوعات/.test(t) ? '💳' : '💵';
+for (const h of items) {
+  if (h.source !== 'Al Jazeera Arabic' && h.source !== 'Al Jazeera Economy') continue;
+  const t = h.title.replace(/\s+-\s+(الجزيرة نت|الجزيرة|Al Jazeera)\s*$/, '').trim();
+  if (!AJ_TOPIC.test(t) || banned(t)) continue;
+  if (/(?:^|[\s(«"])(?:و|ب|ل)?(?:كاردانو|كافا|دوجكوين|شيبا|بيبي|لايتكوين|سوي)(?=$|[\s)»".,:،])|عملة ميم|عملات الميم/.test(t)) continue;
+  if (isRepeat(t, oldTitles.concat(picked.map(p => p.title)))) { console.log('[alerts] Al Jazeera repeat skipped:', t); continue; }
+  if (priceProblem({ title: t, body: '' }, market)) { console.log('[alerts] Al Jazeera price not verified, skipped:', t); continue; }
+  picked.push({ event: '', title: ajIcon(t) + ' ' + t, body: 'المصدر: الجزيرة نت' });
+  console.log('[alerts] Al Jazeera headline added:', t);
+}
+fs.writeFileSync(OUT, JSON.stringify(picked, null, 2));
   console.log('[alerts] picked:', picked.length ? picked.map(p => p.title).join(' | ') : 'nothing new');
   setOutput(picked.length > 0);
 }
