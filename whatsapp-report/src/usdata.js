@@ -102,6 +102,30 @@ function reminderText(g, now) {
     g.events.map(e => block(e)).join('\n\n');
 }
 
+// Owner rule 18 Nov: official sources first, no waiting. The Federal Reserve publishes decisions, minutes and speeches
+// on its own RSS feeds the same minute; CNBC Economy is one of the fastest wires.
+const FAST_FEEDS = [
+  ['federalreserve.gov', 'https://www.federalreserve.gov/feeds/press_monetary.xml'],
+  ['federalreserve.gov', 'https://www.federalreserve.gov/feeds/speeches.xml'],
+  ['CNBC', 'https://www.cnbc.com/id/20910258/device/rss/rss.html']
+];
+async function fastHeadlines(since) {
+  const out = [];
+  for (const [name, url] of FAST_FEEDS) {
+    try {
+      const r = await fetch(url, { headers: UA, signal: AbortSignal.timeout(15000) });
+      if (!r.ok) continue;
+      const xml = await r.text();
+      for (const m of xml.matchAll(/<item>([\s\S]*?)<\/item>/g)) {
+        const pick = tag => ((m[1].match(new RegExp('<' + tag + '>([\\s\\S]*?)</' + tag + '>')) || [])[1] || '').replace(/<!\[CDATA\[|\]\]>/g, '').replace(/<[^>]+>/g, ' ').replace(/&amp;/g, '&').replace(/&#39;/g, "'").replace(/&quot;/g, '"').replace(/\s+/g, ' ').trim();
+        const p = new Date(pick('pubDate'));
+        if (!isNaN(p) && p >= since) out.push(pick('title') + ' — ' + pick('description').slice(0, 300) + ' - ' + name);
+      }
+    } catch (e) { console.log('[usdata] fast feed failed', name, e.message); }
+  }
+  return out;
+}
+
 async function headlinesSince(query, since) {
   const u = 'https://news.google.com/rss/search?q=' + encodeURIComponent(query + ' when:1d') + '&hl=en-US&gl=US&ceid=US:en';
   const r = await fetch(u, { headers: UA, signal: AbortSignal.timeout(20000) });
@@ -159,9 +183,9 @@ function resultPrompt(g, heads, top) {
     '',
     'TASK: find the ACTUAL released value of each release, using ONLY these headlines.',
     'If the headlines do not clearly state the actual numbers yet, reply {"found": false}.',
-    'Use a value ONLY if at least TWO different headlines (different outlets) state the same number; otherwise reply {"found": false}.',
+    'Use a value if the Federal Reserve itself (federalreserve.gov) or ONE major outlet (Reuters, AP, Bloomberg, CNBC, Dow Jones, MarketWatch, WSJ) states it, or two other outlets agree; otherwise reply {"found": false}.',
     'Never guess or invent a number. For a Fed decision the actual is the new rate range or "unchanged".',
-'For FOMC minutes or a speech (no number): the actual is the main message in a few Arabic words (for example: ميل لرفع الفائدة); found is true once two different headlines report what the minutes said.',
+'For FOMC minutes or a speech (no number): the actual is the main message in a few Arabic words (for example: ميل لرفع الفائدة); found is true once the Federal Reserve or one major outlet reports what the minutes or speech said.',
     'Reply JSON only:',
     '{"found": true, "actuals": {"<exact release title>": "<value as in the headline, e.g. 0.3% or 175K>"},',
     ' "meaning": "<one Arabic sentence (max 30 words): higher/lower than expected and what it means for the dollar, rates and bitcoin>"' +
@@ -203,6 +227,7 @@ async function resultFor(g) {
   const q = (QUERIES.find(([re]) => g.events.some(e => re.test(e.title))) || [null, g.events[0].title + ' US'])[1];
   let heads = [];
   try { heads = await headlinesSince(q, new Date(g.d.getTime() - 60000)); } catch (e) { console.log('[usdata] headlines failed', e.message); }
+heads = (await fastHeadlines(new Date(g.d.getTime() - 60000))).concat(heads);
   console.log('[usdata]', q, '- headlines after release:', heads.length);
   if (!heads.length) return null;
   const top = true; // owner rule 18 Nov: every US result goes to the newsroom and WhatsApp the moment it is confirmed
@@ -265,7 +290,7 @@ async function live() {
     const wait = g.d.getTime() + 90000 - Date.now();
     console.log('[usdata] live: waiting', Math.max(0, Math.round(wait / 1000)), 's for the release at', g.key);
     if (wait > 0) await sleep(wait);
-    const end = g.d.getTime() + 25 * 60000;
+    const end = g.d.getTime() + 45 * 60000;
     while (Date.now() < end) {
       const msg = await resultFor(g);
       if (msg) {
@@ -275,7 +300,7 @@ async function live() {
         console.log('[usdata] live: result sent for', g.key);
         break;
       }
-      await sleep(120000);
+      await sleep(60000);
     }
   }
   saveState(state);
