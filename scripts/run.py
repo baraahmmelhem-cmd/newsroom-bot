@@ -59,6 +59,9 @@ FEEDS = {
     "Google News China": "https://news.google.com/rss/search?q=China%20(economy%20OR%20tariffs%20OR%20yuan%20OR%20trade)%20when%3A2h&hl=en-US&gl=US&ceid=US:en",
     "Google News Big Tech": "https://news.google.com/rss/search?q=(Apple%20OR%20Google%20OR%20Microsoft%20OR%20Nvidia%20OR%20Meta%20OR%20Amazon%20OR%20Tesla%20OR%20OpenAI)%20(outage%20OR%20CEO%20OR%20launches%20OR%20lawsuit%20OR%20earnings%20OR%20antitrust)%20when%3A2h&hl=en-US&gl=US&ceid=US:en",
     "Google News Payments": "https://news.google.com/rss/search?q=(%22Apple%20Pay%22%20OR%20%22Google%20Pay%22%20OR%20Visa%20OR%20Mastercard%20OR%20PayPal%20OR%20Stripe%20OR%20%22crypto%20payments%22%20OR%20%22buy%20bitcoin%22)%20when%3A2h&hl=en-US&gl=US&ceid=US:en",
+    "Al Jazeera Arabic": "https://www.aljazeera.net/aljazeerarss/a7c186be-1baa-4bd4-9d80-a84db769f779/73d0e1b4-532f-45ef-b135-bfdff8b8cab9",
+    "Al Jazeera Economy": "https://news.google.com/rss/search?q=site%3Aaljazeera.net%2Febusiness%20when%3A2h&hl=ar&gl=EG&ceid=EG:ar",
+    "Google News AI": "https://news.google.com/rss/search?q=(%22artificial%20intelligence%22%20OR%20OpenAI%20OR%20Anthropic%20OR%20%22AI%20chips%22%20OR%20Nvidia)%20(US%20OR%20China%20OR%20regulation%20OR%20launch%20OR%20ban)%20when%3A2h&hl=en-US&gl=US&ceid=US:en",
     "Al Jazeera": "https://www.aljazeera.com/xml/rss/all.xml",
 }
 
@@ -191,7 +194,10 @@ def confirmed_outlets(item, headlines):
                     s = o.group(1).strip().lower()
             src[int(m.group(1))] = s
     refs = item.get("refs") or []
-    return {src[int(r)] for r in refs if str(r).strip().isdigit() and int(r) in src}
+    found = {src[int(r)] for r in refs if str(r).strip().isdigit() and int(r) in src}
+    if any("jazeera" in s or "الجزيرة" in s for s in found):
+        found.add("al jazeera (trusted source)")  # owner rule 18 Nov: Al Jazeera alone is enough
+    return found
 
 UP = ("ارتفاع", "يرتفع", "ترتفع", "ترتد", "يرتد", "تتجاوز", "يتجاوز", "متجاوز", "تقفز", "يقفز",
       "قفز", "تعاف", "يتعافى", "صعود", "تصعد", "يصعد", "تستعيد", "يستعيد", "مكاسب")
@@ -265,7 +271,7 @@ never publish a story that contradicts the current BTC direction in the headline
 "BTC falls/drops" when the latest headlines show it rising, and vice versa). If an older published
 item is now outdated, write the new development as an update ("يرتد", "يتعافى") instead.
 SCOPE: crypto stories AND major market-moving US/global-economy stories: Fed and US data, Trump decisions on
-tariffs/economy/crypto, US-China, Russia (when market-moving), oil/gold/dollar/Treasury-yield shocks, big tech news (Apple, Google, Microsoft, Nvidia, Meta, Amazon, Tesla, OpenAI: major outages, CEO changes,
+tariffs/economy/crypto, US-China, Russia (when market-moving), oil/gold/dollar/Treasury-yield shocks, AI news (US/China AI, AI chips, AI laws), big tech news (Apple, Google, Microsoft, Nvidia, Meta, Amazon, Tesla, OpenAI: major outages, CEO changes,
 big launches, lawsuits, earnings shocks), payments news (Apple Pay, Google Pay, Visa, Mastercard, PayPal, Stripe,
 stablecoin or crypto payments, new ways to buy or pay with bitcoin), and shock events at mega-cap companies that move
 stocks and crypto. Pick the single story with the BIGGEST market impact right now. NEVER pick anything about Europe
@@ -273,7 +279,7 @@ stocks and crypto. Pick the single story with the BIGGEST market impact right no
 
 CONFIRMATION RULE (owner, very important): choose a story ONLY if at least TWO different outlets in the list
 report the same event, and put the [numbers] of ALL those headlines in "refs". A story from one outlet only is not
-published.
+published, EXCEPT Al Jazeera: an Al Jazeera headline on our topics is enough on its own (owner rule).
 FACTS: use ONLY facts present in the headlines and their summaries above (the text after " — "). Never invent numbers, names or quotes.
 If a detail is not in the headlines, leave it out.
 
