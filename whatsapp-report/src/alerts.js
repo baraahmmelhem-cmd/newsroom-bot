@@ -251,7 +251,8 @@ async function pick() {
     return setOutput(false);
   }
   const names = Object.keys(FEEDS);
-  const results = await Promise.allSettled(names.map(n => fetchFeed(n, FEEDS[n])));
+  // Google News blocks bursts (HTTP 429): its feeds start 1.5 s apart, the others at once.
+const results = await Promise.allSettled(names.map((n, i) => new Promise(r => setTimeout(r, /news\.google\.com/.test(FEEDS[n]) ? i * 1500 : 0)).then(() => fetchFeed(n, FEEDS[n]))));
   let items = [];
   results.forEach((r, i) => {
     if (r.status === 'fulfilled') items.push(...r.value);
