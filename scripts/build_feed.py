@@ -149,7 +149,32 @@ def whatsapp_summary(log, workflow):
 SKIP = re.compile(r"(?m)^(Skipped as repeat of:.*|No new strong story.*|No fresh headlines.*|Posted less than.*|Could not get a live BTC.*|Skipped:.*)$")
 
 
-PARSER_VERSION = 2  # bump when the log parsing changes, so old runs get re-read once
+PARSER_VERSION = 3  # bump when the log parsing changes, so old runs get re-read once
+ALERTS_FILE = Path(__file__).resolve().parent.parent / "whatsapp-report" / "alerts-sent.json"
+
+
+def whatsapp_alerts(repo):
+    """The WhatsApp Breaking News bot records every alert it sent (title + ms timestamp) in
+    whatsapp-report/alerts-sent.json; that file gives the real text of each WhatsApp item."""
+    if not ALERTS_FILE.exists():
+        print("alerts-sent.json not found")
+        return []
+    try:
+        rows = json.loads(ALERTS_FILE.read_text(encoding="utf-8"))
+    except Exception as e:
+        print("alerts-sent.json unreadable:", e)
+        return []
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=14)).timestamp() * 1000
+    out = []
+    for a in rows:
+        ts, title = a.get("ts"), (a.get("title") or "").strip()
+        if not ts or not title or ts < cutoff:
+            continue
+        when = datetime.fromtimestamp(ts / 1000, tz=timezone.utc).isoformat().replace("+00:00", "Z")
+        out.append({"id": f"wa-alert:{ts}", "text": title, "time": when, "workflow": "WhatsApp Breaking News",
+                    "url": f"https://github.com/{repo}/actions/workflows/whatsapp-alerts.yml", "kind": "alert"})
+    print("WhatsApp alerts from alerts-sent.json:", len(out))
+    return out
 
 
 def github():
@@ -158,7 +183,7 @@ def github():
     if prev.get("parser_version") != PARSER_VERSION:
         print("Parser changed: re-reading all run logs once")
         prev = {**prev, "whatsapp": [], "runs": [x for x in prev.get("runs", []) if x.get("note")]}
-    cache = {x["run_id"]: x for x in prev.get("newsroom", []) + prev.get("whatsapp", []) if "run_id" in x}
+    cache = {x["run_id"]: x for x in prev.get("newsroom", []) + prev.get("whatsapp", []) if x.get("run_id")}
     cached_runs = {x["run_id"] for x in prev.get("runs", []) if x.get("status") == "completed"}
     runs = gh(f"/repos/{repo}/actions/runs?per_page=60").json()["workflow_runs"]
     newsroom = [x for x in prev.get("newsroom", []) if "run_id" in x]
@@ -219,7 +244,10 @@ def github():
         summary.append(row)
     cutoff = (datetime.now(timezone.utc) - timedelta(days=14)).isoformat()
     newsroom = sorted({x["run_id"]: x for x in newsroom}.values(), key=lambda x: x["time"], reverse=True)
-    whatsapp = sorted({x["run_id"]: x for x in whatsapp}.values(), key=lambda x: x["time"], reverse=True)
+    # Breaking News runs are replaced by the real alert texts from alerts-sent.json
+    whatsapp = [x for x in {x["run_id"]: x for x in whatsapp if "run_id" in x}.values()
+                if "breaking" not in (x.get("workflow") or "").lower()]
+    whatsapp = sorted(whatsapp + whatsapp_alerts(repo), key=lambda x: x["time"], reverse=True)
     newsroom = [x for x in newsroom if x["time"] >= cutoff][:200]
     whatsapp = [x for x in whatsapp if x["time"] >= cutoff][:200]
     print("newsroom:", len(newsroom), "whatsapp:", len(whatsapp), "runs:", len(summary))
