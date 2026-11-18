@@ -16,7 +16,6 @@ const MAX_PER_DAY = 100000;   // no daily cap (user: quantity does not matter, o
 
 const GN = 'https://news.google.com/rss/search?hl=en-US&gl=US&ceid=US:en&q=';
 const FEEDS = {
-  'CryptoPanic': 'https://cryptopanic.com/news/rss/',
   'Cointelegraph': 'https://cointelegraph.com/rss',
   'CoinDesk': 'https://www.coindesk.com/arc/outboundfeeds/rss/',
   'The Block': 'https://www.theblock.co/rss.xml',
@@ -40,7 +39,10 @@ const FEEDS = {
 // Al Jazeera is the owner's reference source (18 Nov): English, Arabic and the Arabic economy section.
 'Al Jazeera': 'https://www.aljazeera.com/xml/rss/all.xml',
 'Al Jazeera Arabic': 'https://www.aljazeera.net/aljazeerarss/a7c186be-1baa-4bd4-9d80-a84db769f779/73d0e1b4-532f-45ef-b135-bfdff8b8cab9',
-'Al Jazeera Economy': 'https://news.google.com/rss/search?q=site%3Aaljazeera.net%2Febusiness%20when%3A2h&hl=ar&gl=EG&ceid=EG:ar'
+'Arabic Economy': 'https://news.google.com/rss/search?q=' + encodeURIComponent('(site:aljazeera.net/ebusiness OR site:asharqbusiness.com OR site:alarabiya.net/aswaq) when:2h') + '&hl=ar&gl=EG&ceid=EG:ar',
+'Cointelegraph Arabic': 'https://ar.cointelegraph.com/rss',
+'Wu Blockchain': 'https://wublock.substack.com/feed',
+'Reuters Bloomberg': GN + encodeURIComponent('(site:reuters.com OR site:bloomberg.com) (markets OR economy OR Fed OR bitcoin OR oil OR gold OR dollar) when:2h')
 };
 
 const BANNED = ['israel', 'israeli', 'gaza', 'netanyahu', 'hamas', 'hezbollah', 'europe', 'european', ' eu ', "eu's",
@@ -257,10 +259,10 @@ async function pick() {
   });
   const seen = new Set();
   items = items
-    .filter(h => { const age = (now - h.ts) / 60000; return age >= -10 && age <= (/^Al Jazeera/.test(h.source) ? 360 : FRESH_MIN) && !banned(h.title); })
+    .filter(h => { const age = (now - h.ts) / 60000; return age >= -10 && age <= (/^(Al Jazeera|Arabic Economy|Cointelegraph Arabic)/.test(h.source) ? 360 : FRESH_MIN) && !banned(h.title); })
     .sort((a, b) => b.ts - a.ts)
     .filter(h => { const k = h.title.toLowerCase().slice(0, 70); if (seen.has(k)) return false; seen.add(k); return true; })
-    .filter((h, i) => i < 60 || /^Al Jazeera/.test(h.source));
+    .filter((h, i) => i < 60 || /^(Al Jazeera|Arabic Economy|Cointelegraph Arabic)/.test(h.source));
   console.log('[alerts] fresh headlines (last ' + FRESH_MIN + ' min):', items.length);
   fs.mkdirSync(path.dirname(OUT), { recursive: true });
   if (!items.length) { fs.writeFileSync(OUT, '[]'); return setOutput(false); }
@@ -285,7 +287,7 @@ const btcMove = t => /📉|📈/.test(t) && /بيتكوين|بتكوين|bitcoin
 if (btcMove(x.title) && !(market.BTC && Math.abs(market.BTC.change || 0) >= 5) && sent.concat(picked).some(s => btcMove(s.title) && now - (s.ts || now) < 4 * 3600 * 1000)) { console.log('[alerts] skipped (Bitcoin move already sent in the last 4h):', x.title); continue; }
     const refs = [...new Set((Array.isArray(x.refs) ? x.refs : []).map(Number).filter(n => n >= 1 && n <= items.length))];
     const outlets = new Set(refs.map(n => outletOf(items[n - 1])));
-    const trusted = [...outlets].some(o => /jazeera|الجزيرة/i.test(o));
+    const trusted = [...outlets].some(o => /jazeera|الجزيرة|reuters|رويترز|bloomberg|بلومبرغ|asharq|الشرق|cointelegraph arabic/i.test(o));
 if (outlets.size < 2 && !trusted) { console.log('[alerts] skipped (not confirmed by 2 outlets):', x.title, '-', [...outlets].join(', ') || 'no refs'); continue; }
     const bad = priceProblem(x, market);
     if (bad) { console.log('[alerts] skipped (price not verified):', x.title, '-', bad); continue; }
@@ -302,13 +304,15 @@ if (/\b(ADA|KAVA|DOGE|SHIB|PEPE|LTC|AVAX|TRX|TON|LINK|SUI|HYPE|ZEC|XMR|BCH|DOT|M
 const AJ_TOPIC = /بيتكوين|بتكوين|العملات|كريبتو|إيثيريوم|إيثريوم|الذهب|ذهب|الفضة|النفط|نفط|برنت|الخام|وول ستريت|الأسهم الأمريكية|داو جونز|ناسداك|الفدرالي|الفيدرالي|الاحتياطي الاتحادي|باول|الفائدة|الدولار|إنفيديا|أبل|آبل|غوغل|مايكروسوفت|ميتا|أمازون|تسلا|أوبن إيه آي|أنثروبيك|الذكاء الاصطناعي|فيزا|ماستركارد|باي بال|المدفوعات|هرمز/;
 const ajIcon = t => /ذهب|الفضة/.test(t) ? '🪙' : /نفط|برنت|الخام|هرمز/.test(t) ? '🛢️' : /وول ستريت|الأسهم|داو جونز|ناسداك/.test(t) ? '📊' : /الفدرالي|الفيدرالي|الاحتياطي|باول|الفائدة/.test(t) ? '🏦' : /بيتكوين|بتكوين|كريبتو|إيثيريوم|إيثريوم|المشفرة|الرقمية/.test(t) ? '💰' : /الذكاء الاصطناعي|إنفيديا|أبل|آبل|غوغل|مايكروسوفت|ميتا|أمازون|تسلا|أوبن|أنثروبيك/.test(t) ? '💻' : /فيزا|ماستركارد|باي بال|المدفوعات/.test(t) ? '💳' : '💵';
 for (const h of items) {
-  if (h.source !== 'Al Jazeera Arabic' && h.source !== 'Al Jazeera Economy') continue;
-  const t = h.title.replace(/\s+-\s+(الجزيرة نت|الجزيرة|Al Jazeera)\s*$/, '').trim();
+  if (!['Al Jazeera Arabic', 'Arabic Economy', 'Cointelegraph Arabic'].includes(h.source)) continue;
+  const m = h.title.match(/\s+-\s+([^-]{2,40})\s*$/);
+  const t = h.title.replace(/\s+-\s+[^-]{2,40}\s*$/, '').trim();
+  const src = h.source === 'Cointelegraph Arabic' ? 'كوينتيليغراف عربي' : (m ? m[1].trim() : 'الجزيرة نت');
   if (!AJ_TOPIC.test(t) || banned(t)) continue;
   if (/(?:^|[\s(«"])(?:و|ب|ل)?(?:كاردانو|كافا|دوجكوين|شيبا|بيبي|لايتكوين|سوي)(?=$|[\s)»".,:،])|عملة ميم|عملات الميم/.test(t)) continue;
   if (isRepeat(t, oldTitles.concat(picked.map(p => p.title)))) { console.log('[alerts] Al Jazeera repeat skipped:', t); continue; }
   if (priceProblem({ title: t, body: '' }, market)) { console.log('[alerts] Al Jazeera price not verified, skipped:', t); continue; }
-  picked.push({ event: '', title: ajIcon(t) + ' ' + t, body: 'المصدر: الجزيرة نت' });
+  picked.push({ event: '', title: ajIcon(t) + ' ' + t, body: 'المصدر: ' + src });
   console.log('[alerts] Al Jazeera headline added:', t);
 }
 fs.writeFileSync(OUT, JSON.stringify(picked, null, 2));
