@@ -178,7 +178,7 @@ function buildPrompt(headlines, sent, market = {}) {
     '- Trump statements or decisions that can move markets (tariffs, crypto, the dollar, the Fed, China).',
     '- Sudden breaking news: exchange hacks or collapses, big ETF flows, new US crypto laws or rulings.',
 'Topics allowed:',
-    '- Crypto: big moves of the owner's HALAL coins ONLY (BTC, ETH, XRP, SOL, XLM, BNB; never write about the price of any other coin or memecoin), major hacks, exchange news (Binance etc.), ETF flows, regulation (SEC, CFTC, Congress).',
+    '- Crypto: big moves of the owner HALAL coins ONLY (BTC, ETH, XRP, SOL, XLM, BNB; never write about the price of any other coin or memecoin), major hacks, exchange news (Binance etc.), ETF flows, regulation (SEC, CFTC, Congress).',
     '- USA: Fed decisions, key data (CPI, jobs, GDP, PCE), Congress or White House decisions that move markets.',
     '- Trump: statements or decisions that move markets (tariffs, crypto, the dollar, the Fed).',
     '- China: economy, tariffs, US-China relations, the yuan, crypto policy.',
