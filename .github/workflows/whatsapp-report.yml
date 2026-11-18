@@ -4,6 +4,9 @@ on:
   workflow_run:            # runs right after "Hourly news" (dispatched every hour); the job below only runs at 8:00 and 21:00 Dubai
     workflows: ["US Data Watch"]   # chained: the WhatsApp jobs run one after another so none is cancelled
     types: [completed]
+  schedule:
+    - cron: '1 4 * * *'     # owner 18 Nov: morning card 07:00 Amman (fixed time, not the hourly chain)
+    - cron: '1 17 * * *'    # evening card 20:00 Amman
   workflow_dispatch:
     inputs:
       mode:
@@ -22,7 +25,7 @@ concurrency:
 
 jobs:
   report:
-    if: ${{ github.event_name != 'workflow_run' || contains(github.event.workflow_run.created_at, 'T04:') || contains(github.event.workflow_run.created_at, 'T17:') }}
+    if: ${{ github.event_name != 'workflow_run' }}   # runs only on its own schedule or by hand
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
@@ -31,7 +34,7 @@ jobs:
       GREENAPI_API_TOKEN: ${{ secrets.GREENAPI_API_TOKEN }}
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
       MODE: ${{ github.event.inputs.mode || 'send' }}
-      REPORT_KIND: ${{ (contains(github.event.workflow_run.created_at, 'T17:') || github.event.inputs.mode == 'evening') && 'evening' || 'morning' }}
+      REPORT_KIND: ${{ (github.event.schedule == '1 17 * * *' || github.event.inputs.mode == 'evening') && 'evening' || 'morning' }}
     defaults:
       run:
         working-directory: whatsapp-report

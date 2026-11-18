@@ -6,7 +6,8 @@ on:
     types: [completed]
   workflow_dispatch:
   schedule:
-    - cron: '41 4 * * 1-5'   # owner 18 Nov: US agenda every weekday morning (~07:41 Amman), not tied to the hourly chain
+    - cron: '2 5 * * 1-5'    # owner 18 Nov: today's US agenda Mon-Fri at ~08:00 Amman (one hour after the 07:00 card)
+    - cron: '3 11 * * 6'     # owner 18 Nov: the whole coming week every Saturday at ~14:00 Amman
 
 permissions:
   contents: write
