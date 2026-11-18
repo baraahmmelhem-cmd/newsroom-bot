@@ -2,23 +2,35 @@ name: WhatsApp Economic Calendar
 
 on:
   workflow_run:            # right after "Hourly news" (dispatched every hour); the job runs only on the 8:00 Amman one
-    workflows: ["WhatsApp Morning Report"]   # chained: the WhatsApp jobs run one after another so none is cancelled
+    workflows: ["Hourly news"]   # chained: the WhatsApp jobs run one after another so none is cancelled
     types: [completed]
   workflow_dispatch:
-  schedule:
-    - cron: '2 5 * * 1-5'    # owner 18 Nov: today's US agenda Mon-Fri at ~08:00 Amman (one hour after the 07:00 card)
-    - cron: '3 11 * * 6'     # owner 18 Nov: the whole coming week every Saturday at ~14:00 Amman
 
 permissions:
   contents: write
 
 concurrency:
-  group: whatsapp-report # never use the WhatsApp session at the same time as the other WhatsApp jobs
+  group: whatsapp-calendar   # own group so it is never cancelled by another WhatsApp job
   cancel-in-progress: false
 
 jobs:
+  gate:   # owner 18 Nov: today's agenda Mon-Fri 08:00 Amman, the week ahead Saturday 14:00 Amman (time of the Hourly news run)
+    runs-on: ubuntu-latest
+    outputs:
+      go: ${{ steps.g.outputs.go }}
+    steps:
+      - id: g
+        env:
+          EV: ${{ github.event_name }}
+          CREATED: ${{ github.event.workflow_run.created_at }}
+        run: |
+          if [ "$EV" = "workflow_dispatch" ]; then echo go=true >> "$GITHUB_OUTPUT"; exit 0; fi
+          H=$(date -u -d "$CREATED" +%H); D=$(date -u -d "$CREATED" +%u)
+          if { [ "$D" -le 5 ] && [ "$H" = "05" ]; } || { [ "$D" = "6" ] && [ "$H" = "11" ]; }; then echo go=true >> "$GITHUB_OUTPUT"; else echo go=false >> "$GITHUB_OUTPUT"; fi
+          echo "created=$CREATED hour=$H day=$D"
   calendar:
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' }}
+    needs: gate
+    if: ${{ needs.gate.outputs.go == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:

@@ -2,11 +2,8 @@ name: WhatsApp Morning Report
 
 on:
   workflow_run:            # runs right after "Hourly news" (dispatched every hour); the job below only runs at 8:00 and 21:00 Dubai
-    workflows: ["US Data Watch"]   # chained: the WhatsApp jobs run one after another so none is cancelled
+    workflows: ["Hourly news"]   # chained: the WhatsApp jobs run one after another so none is cancelled
     types: [completed]
-  schedule:
-    - cron: '1 4 * * *'     # owner 18 Nov: morning card 07:00 Amman (fixed time, not the hourly chain)
-    - cron: '1 17 * * *'    # evening card 20:00 Amman
   workflow_dispatch:
     inputs:
       mode:
@@ -20,12 +17,12 @@ permissions:
   contents: write
 
 concurrency:
-  group: whatsapp-report
+  group: whatsapp-card   # own group: a long US Data Watch run must not cancel the card
   cancel-in-progress: false
 
 jobs:
   report:
-    if: ${{ github.event_name != 'workflow_run' }}   # runs only on its own schedule or by hand
+    if: ${{ github.event_name == 'workflow_dispatch' || contains(github.event.workflow_run.created_at, 'T04:') || contains(github.event.workflow_run.created_at, 'T17:') }}   # owner 18 Nov: 07:00 and 20:00 Amman, from the Hourly news run (always on time; GitHub schedules never fired here)
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
@@ -34,7 +31,7 @@ jobs:
       GREENAPI_API_TOKEN: ${{ secrets.GREENAPI_API_TOKEN }}
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
       MODE: ${{ github.event.inputs.mode || 'send' }}
-      REPORT_KIND: ${{ (github.event.schedule == '1 17 * * *' || github.event.inputs.mode == 'evening') && 'evening' || 'morning' }}
+      REPORT_KIND: ${{ (contains(github.event.workflow_run.created_at, 'T17:') || github.event.inputs.mode == 'evening') && 'evening' || 'morning' }}
     defaults:
       run:
         working-directory: whatsapp-report
