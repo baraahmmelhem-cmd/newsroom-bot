@@ -138,9 +138,10 @@ function buildMessages(events, now) {
   const tmr = events.filter(e => dayKey(e.d) === tomorrowKey);
 
   // Monday (Amman): the whole week, grouped by day
-  if (amman(now).getUTCDay() === 1) {
-    const endDay = new Date(now.getTime() + 4 * 24 * 3600 * 1000);
-    const end = now.getTime() + 6 * 24 * 3600 * 1000;
+  // Owner 18 Nov: the whole coming week every Saturday (14:00 Amman) instead of Mondays; weekdays get today + tomorrow.
+  if (amman(now).getUTCDay() === 6) {
+    const endDay = new Date(now.getTime() + 6 * 24 * 3600 * 1000);
+    const end = now.getTime() + 7 * 24 * 3600 * 1000;
     const week = events.filter(e => e.d.getTime() >= now.getTime() - 12 * 3600 * 1000 && e.d.getTime() <= end);
     const days = [];
     for (const e of week) {
@@ -157,6 +158,7 @@ function buildMessages(events, now) {
       'من ' + dateAr(now) + ' إلى ' + dateAr(endDay) + '\n\n' +
       body + FOOTER
     );
+    return msgs; // Saturday: only the week ahead
   }
 
   msgs.push(
