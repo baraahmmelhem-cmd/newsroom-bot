@@ -53,6 +53,12 @@ FEEDS = {
     "MarketWatch": "https://feeds.content.dowjones.io/public/rss/mw_topstories",
     "CNBC Top News": "https://www.cnbc.com/id/100003114/device/rss/rss.html",
     "CNBC Tech": "https://www.cnbc.com/id/19854910/device/rss/rss.html",
+    "Google News Crypto": "https://news.google.com/rss/search?q=(bitcoin%20OR%20crypto%20OR%20Binance%20OR%20stablecoin)%20when%3A2h&hl=en-US&gl=US&ceid=US:en",
+    "Google News Fed": "https://news.google.com/rss/search?q=(%22Federal%20Reserve%22%20OR%20Powell%20OR%20CPI%20OR%20%22jobs%20report%22%20OR%20%22interest%20rate%22)%20when%3A2h&hl=en-US&gl=US&ceid=US:en",
+    "Google News Trump": "https://news.google.com/rss/search?q=Trump%20(tariffs%20OR%20economy%20OR%20crypto%20OR%20dollar%20OR%20China)%20when%3A2h&hl=en-US&gl=US&ceid=US:en",
+    "Google News China": "https://news.google.com/rss/search?q=China%20(economy%20OR%20tariffs%20OR%20yuan%20OR%20trade)%20when%3A2h&hl=en-US&gl=US&ceid=US:en",
+    "Google News Big Tech": "https://news.google.com/rss/search?q=(Apple%20OR%20Google%20OR%20Microsoft%20OR%20Nvidia%20OR%20Meta%20OR%20Amazon%20OR%20Tesla%20OR%20OpenAI)%20(outage%20OR%20CEO%20OR%20launches%20OR%20lawsuit%20OR%20earnings%20OR%20antitrust)%20when%3A2h&hl=en-US&gl=US&ceid=US:en",
+    "Google News Payments": "https://news.google.com/rss/search?q=(%22Apple%20Pay%22%20OR%20%22Google%20Pay%22%20OR%20Visa%20OR%20Mastercard%20OR%20PayPal%20OR%20Stripe%20OR%20%22crypto%20payments%22%20OR%20%22buy%20bitcoin%22)%20when%3A2h&hl=en-US&gl=US&ceid=US:en",
     "Al Jazeera": "https://www.aljazeera.com/xml/rss/all.xml",
 }
 
@@ -178,7 +184,12 @@ def confirmed_outlets(item, headlines):
     for line in (headlines or "").splitlines():
         m = re.match(r"^\[(\d+)\].*\[([^\]]+)\]\s*$", line)
         if m:
-            src[int(m.group(1))] = m.group(2).strip().lower()
+            s = m.group(2).strip().lower()
+            if s.startswith("google news"):  # Google News: the real outlet is after " - " in the title
+                o = re.search(r" - ([^\-—\[\]]{2,40}?)\s*(?:—|\[)", line)
+                if o:
+                    s = o.group(1).strip().lower()
+            src[int(m.group(1))] = s
     refs = item.get("refs") or []
     return {src[int(r)] for r in refs if str(r).strip().isdigit() and int(r) in src}
 
@@ -254,7 +265,9 @@ never publish a story that contradicts the current BTC direction in the headline
 "BTC falls/drops" when the latest headlines show it rising, and vice versa). If an older published
 item is now outdated, write the new development as an update ("يرتد", "يتعافى") instead.
 SCOPE: crypto stories AND major market-moving US/global-economy stories: Fed and US data, Trump decisions on
-tariffs/economy/crypto, US-China, Russia (when market-moving), oil/gold/dollar/Treasury-yield shocks, and shock events at mega-cap companies that move
+tariffs/economy/crypto, US-China, Russia (when market-moving), oil/gold/dollar/Treasury-yield shocks, big tech news (Apple, Google, Microsoft, Nvidia, Meta, Amazon, Tesla, OpenAI: major outages, CEO changes,
+big launches, lawsuits, earnings shocks), payments news (Apple Pay, Google Pay, Visa, Mastercard, PayPal, Stripe,
+stablecoin or crypto payments, new ways to buy or pay with bitcoin), and shock events at mega-cap companies that move
 stocks and crypto. Pick the single story with the BIGGEST market impact right now. NEVER pick anything about Europe
 (ECB, Lagarde, EU, eurozone, European countries or companies) or Israel; skip those entirely.
 
