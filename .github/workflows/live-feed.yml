@@ -9,7 +9,7 @@ on:
     - cron: "*/10 * * * *"
   workflow_dispatch:
   workflow_run:
-    workflows: ["Hourly news", "WhatsApp to site"]
+    workflows: ["Hourly news", "WhatsApp Breaking News", "WhatsApp Morning Report", "WhatsApp Manual Message", "WhatsApp Economic Calendar", "US Data Watch", "WhatsApp to site"]
     types: [completed]
 concurrency:
   group: live-feed
