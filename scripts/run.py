@@ -318,12 +318,16 @@ big US data release); otherwise false.
 If every strong story is already published, reply {{"skip": true}}."""
 
 
-def write_item(headlines, posted, btc):
+def write_item(headlines, posted, btc, force=False):
     """Uses Google Gemini (free tier) by default; set LLM=anthropic to use Claude instead (paid)."""
     prompt = PROMPT.format(headlines=headlines, btc=btc,
                            posted="\n".join(f"- {t}" for t in posted[-60:]) or "(none)")
     if MUST:
         prompt += MUST_RULE
+    if force:
+        prompt += ("\n\nFINAL RULE: the owner requires one story every 2 hours. Do NOT reply skip. "
+                   "Pick the strongest headline in the list that is not the same event as a posted title, "
+                   "even if it is only moderately important, and write it.")
     if env("LLM", required=False, default="gemini") == "anthropic":
         r = requests.post(
             "https://api.anthropic.com/v1/messages",
@@ -527,6 +531,10 @@ def main():
         print("Model skipped in a daily slot; asking once more.", flush=True)
         time.sleep(8)
         item = write_item(headlines, posted, btc)
+    if item.get("skip"):
+        print("Still skipped; forcing one pick (one story every 2 hours).", flush=True)
+        time.sleep(5)
+        item = write_item(headlines, posted, btc, force=True)
     if item.get("skip"):
         print("No new strong story; nothing published.")
         return
