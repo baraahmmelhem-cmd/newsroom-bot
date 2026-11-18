@@ -35,7 +35,12 @@ const FEEDS = {
   'Google News Trump': GN + encodeURIComponent('Trump when:2h'),
   'Google News China': GN + encodeURIComponent('China (economy OR tariffs OR yuan) when:2h'),
   'Google News Fed': GN + encodeURIComponent('("Federal Reserve" OR CPI OR "jobs report" OR Powell) when:2h'),
-  'Google News Crypto': GN + encodeURIComponent('(bitcoin OR crypto OR Binance) when:2h')
+  'Google News Crypto': GN + encodeURIComponent('(bitcoin OR crypto OR Binance) when:2h'),
+'Google News AI': GN + encodeURIComponent('("artificial intelligence" OR OpenAI OR Anthropic OR "AI chips" OR Nvidia) (US OR China OR regulation OR launch OR ban) when:2h'),
+// Al Jazeera is the owner's reference source (18 Nov): English, Arabic and the Arabic economy section.
+'Al Jazeera': 'https://www.aljazeera.com/xml/rss/all.xml',
+'Al Jazeera Arabic': 'https://www.aljazeera.net/aljazeerarss/a7c186be-1baa-4bd4-9d80-a84db769f779/73d0e1b4-532f-45ef-b135-bfdff8b8cab9',
+'Al Jazeera Economy': 'https://news.google.com/rss/search?q=site%3Aaljazeera.net%2Febusiness%20when%3A2h&hl=ar&gl=EG&ceid=EG:ar'
 };
 
 const BANNED = ['israel', 'israeli', 'gaza', 'netanyahu', 'hamas', 'hezbollah', 'europe', 'european', ' eu ', "eu's",
@@ -153,6 +158,8 @@ function buildPrompt(headlines, sent, market = {}) {
     'it is outdated: do not send it as a price story. Call a move sharp only if the live 24h change is at least 3%.',
     'CONFIRMATION RULE (very important): send a story ONLY if at least TWO different outlets in the list report the same',
     'event. In "refs" list the [numbers] of ALL headlines above that report it.',
+'AL JAZEERA (owner rule): Al Jazeera is our reference source. Any Al Jazeera headline ([Al Jazeera], [Al Jazeera Arabic],',
+'[Al Jazeera Economy] or ending "- Al Jazeera" / "الجزيرة") on our topics may be sent even if no other outlet has it yet. Never miss them.',
     '',
     'Already sent to the user, with the event key of each where known. NO REPEATS (owner rule): a story about the SAME',
 'event or topic is a repeat even with other words, another outlet or a small update. Follow-ups like "arrives",',
@@ -178,6 +185,7 @@ function buildPrompt(headlines, sent, market = {}) {
     '- Market shocks: big moves in oil, gold, the dollar, stock market crashes.',
     '- Big tech: important news about Apple, Google, Microsoft, Nvidia, Meta, Amazon, Tesla, OpenAI (major service outages,',
     '  CEO or leadership changes, big launches, big lawsuits or regulation, earnings shocks).',
+  '- AI: important artificial-intelligence news in the US or China (OpenAI, Anthropic, Google, Nvidia, AI chips, AI laws, export bans).',
     '- Payments: Apple Pay, Google Pay, Visa, Mastercard, PayPal, Stripe, stablecoin or crypto payments, and any new way for',
     '  people to buy, hold or pay with bitcoin and crypto (cards, wallets, banks, apps).',
     'Skip: routine or weekly data (Fed balance sheet, weekly H.4.1, minor speeches), anything vague like "raises questions",',
@@ -277,7 +285,8 @@ const btcMove = t => /📉|📈/.test(t) && /بيتكوين|بتكوين|bitcoin
 if (btcMove(x.title) && !(market.BTC && Math.abs(market.BTC.change || 0) >= 5) && sent.concat(picked).some(s => btcMove(s.title) && now - (s.ts || now) < 4 * 3600 * 1000)) { console.log('[alerts] skipped (Bitcoin move already sent in the last 4h):', x.title); continue; }
     const refs = [...new Set((Array.isArray(x.refs) ? x.refs : []).map(Number).filter(n => n >= 1 && n <= items.length))];
     const outlets = new Set(refs.map(n => outletOf(items[n - 1])));
-    if (outlets.size < 2) { console.log('[alerts] skipped (not confirmed by 2 outlets):', x.title, '-', [...outlets].join(', ') || 'no refs'); continue; }
+    const trusted = [...outlets].some(o => /jazeera|الجزيرة/i.test(o));
+if (outlets.size < 2 && !trusted) { console.log('[alerts] skipped (not confirmed by 2 outlets):', x.title, '-', [...outlets].join(', ') || 'no refs'); continue; }
     const bad = priceProblem(x, market);
     if (bad) { console.log('[alerts] skipped (price not verified):', x.title, '-', bad); continue; }
     let body = String(x.body).trim();
