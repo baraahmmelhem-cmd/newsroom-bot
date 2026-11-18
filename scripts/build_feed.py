@@ -119,12 +119,45 @@ def previous_feed():
 PUB = re.compile(r"(?m)^Published:\s*(.+?)(?:\s*\|\s*source:\s*(.+))?\s*$")
 MODEL = re.compile(r"(?m)^Using model:\s*(.+)$")
 SENT = re.compile(r"(?mi)^(?:sent|أُرسل|أرسل|تم الإرسال|message sent|delivered|whatsapp sent)\b[:\s-]*(.+)$")
+# Green API (the WhatsApp sender used by the WhatsApp * workflows) prints lines like:
+#   [green] destination: group 1203...@g.us
+#   [green] message sent to self chat {"idMessage":"...","urlFile":"https://...png"}
+#   AI summary: 3 items            [detail] written with gemini-flash-lite-latest
+GREEN_SENT = re.compile(r"(?m)^\[green\] message sent\b.*$")
+GREEN_DEST = re.compile(r"(?m)^\[green\] destination:\s*(.+)$")
+AI_ITEMS = re.compile(r"(?m)^AI summary:\s*(\d+)\s*items?")
+WRITTEN_WITH = re.compile(r"(?m)^\[detail\] written with\s*(\S+)")
+
+
+def whatsapp_summary(log, workflow):
+    """Human text for one WhatsApp run, or None when nothing was sent."""
+    sent = GREEN_SENT.findall(log)
+    if not sent:
+        return None
+    parts = []
+    n = AI_ITEMS.search(log)
+    if n:
+        parts.append(f"{n.group(1)} أخبار")
+    dest = GREEN_DEST.search(log)
+    where = "المجموعة" if dest and "@g.us" in dest.group(1) else ("المشتركين" if dest else "واتساب")
+    kind = "صورة + نص" if any("urlFile" in s for s in sent) else "نص"
+    parts.append(f"{len(sent)} رسالة ({kind}) إلى {where}")
+    m = WRITTEN_WITH.search(log)
+    if m:
+        parts.append(f"كتبه {m.group(1)}")
+    return f"{workflow}: " + " · ".join(parts)
 SKIP = re.compile(r"(?m)^(Skipped as repeat of:.*|No new strong story.*|No fresh headlines.*|Posted less than.*|Could not get a live BTC.*|Skipped:.*)$")
+
+
+PARSER_VERSION = 2  # bump when the log parsing changes, so old runs get re-read once
 
 
 def github():
     repo = os.environ["GITHUB_REPOSITORY"]
     prev = previous_feed()
+    if prev.get("parser_version") != PARSER_VERSION:
+        print("Parser changed: re-reading all run logs once")
+        prev = {**prev, "whatsapp": [], "runs": [x for x in prev.get("runs", []) if x.get("note")]}
     cache = {x["run_id"]: x for x in prev.get("newsroom", []) + prev.get("whatsapp", []) if "run_id" in x}
     cached_runs = {x["run_id"] for x in prev.get("runs", []) if x.get("status") == "completed"}
     runs = gh(f"/repos/{repo}/actions/runs?per_page=60").json()["workflow_runs"]
@@ -153,13 +186,17 @@ def github():
                 newsroom.append(item)
                 row["note"] = "نُشر: " + item["title"]
             if is_wa:
-                lines = [x.group(1).strip() for x in SENT.finditer(log)][:5]
-                if r.get("conclusion") == "success" and not lines and "Published:" not in log:
-                    lines = []  # nothing recognisable; the run still shows in "runs"
-                if lines:
-                    whatsapp.append({"id": f"wa:{rid}", "run_id": rid, "text": " · ".join(lines),
-                                     "time": r["updated_at"], "url": r["html_url"], "workflow": r["name"]})
-                    row["note"] = "واتساب: " + lines[0][:120]
+                text = whatsapp_summary(log, r["name"])
+                if not text:
+                    lines = [x.group(1).strip() for x in SENT.finditer(log)][:5]
+                    text = " · ".join(lines) if lines else None
+                if text:
+                    whatsapp.append({"id": f"wa:{rid}", "run_id": rid, "text": text,
+                                     "time": r["updated_at"], "url": r["html_url"], "workflow": r["name"],
+                                     "model": (WRITTEN_WITH.search(log).group(1) if WRITTEN_WITH.search(log) else None)})
+                    row["note"] = "واتساب: " + text[:120]
+                elif r.get("conclusion") == "success":
+                    row["note"] = "لم تُرسل رسالة"
             if not row["note"]:
                 s = SKIP.search(log)
                 if s:
@@ -192,6 +229,7 @@ def github():
 def main():
     newsroom, whatsapp, runs = github()
     feed = {"generated": datetime.now(timezone.utc).isoformat(), "repo": os.environ["GITHUB_REPOSITORY"],
+            "parser_version": PARSER_VERSION,
             "aljazeera": aljazeera(), "newsroom": newsroom, "whatsapp": whatsapp, "runs": runs}
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(feed, ensure_ascii=False, indent=1), encoding="utf-8")
