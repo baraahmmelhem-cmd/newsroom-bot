@@ -5,6 +5,8 @@ on:
     workflows: ["WhatsApp Morning Report"]   # chained: the WhatsApp jobs run one after another so none is cancelled
     types: [completed]
   workflow_dispatch:
+  schedule:
+    - cron: '41 4 * * 1-5'   # owner 18 Nov: US agenda every weekday morning (~07:41 Amman), not tied to the hourly chain
 
 permissions:
   contents: write
@@ -15,7 +17,7 @@ concurrency:
 
 jobs:
   calendar:
-    if: ${{ github.event_name == 'workflow_dispatch' || contains(github.event.workflow_run.created_at, 'T05:') }}
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
