@@ -83,7 +83,7 @@ function words(s) {
   const stop = new Set(['في', 'من', 'إلى', 'على', 'بعد', 'مع', 'عن', 'عاجل', 'دولار', 'مليون', 'مليار', 'the', 'a', 'to', 'of']);
   const out = new Set();
   for (let w of String(s).toLowerCase().match(/\d+|[\p{L}]{3,}/gu) || []) {
-    if (w.startsWith('ال') && w.length > 4) w = w.slice(2);
+    w = w.replace(/^(?:و|ف|ب|ل)(?=ال)/, ''); if (w.startsWith('ال') && w.length > 4) w = w.slice(2);
     if (!stop.has(w)) out.add(w);
   }
   return out;
@@ -91,12 +91,12 @@ function words(s) {
 
 function isRepeat(title, oldTitles) {
   const a = words(title);
-  for (const old of oldTitles.slice(-40)) {
+  for (const old of oldTitles.slice(-80)) {
     const b = words(old);
     if (!a.size || !b.size) continue;
     let common = 0;
     for (const w of a) if (b.has(w)) common++;
-    if (common / Math.min(a.size, b.size) >= 0.5) return old;
+    if (common / Math.min(a.size, b.size) >= 0.4) return old;
   }
   return null;
 }
@@ -141,7 +141,7 @@ function outletOf(h) {
 function buildPrompt(headlines, sent, market = {}) {
   const now = Date.now();
   const list = headlines.map((h, i) => '[' + (i + 1) + '] (' + Math.round((now - h.ts) / 60000) + ' min ago) ' + h.title + ' [' + h.source + ']').join('\n');
-  const done = sent.slice(-40).map(s => '- ' + s.title).join('\n') || '(none)';
+  const done = sent.slice(-60).map(s => '- ' + s.title + (s.event ? '  {event: ' + s.event + '}' : '')).join('\n') || '(none)';
   return [
     'You are the urgent-news desk of Mr_Amwal, an Arabic crypto/economy news service for Arab traders.',
     'Fresh headlines (newest first, age in minutes, source):',
@@ -154,7 +154,12 @@ function buildPrompt(headlines, sent, market = {}) {
     'CONFIRMATION RULE (very important): send a story ONLY if at least TWO different outlets in the list report the same',
     'event. In "refs" list the [numbers] of ALL headlines above that report it.',
     '',
-    'Already sent to the user (the SAME event is a repeat; only a genuinely new development counts as new):',
+    'Already sent to the user, with the event key of each where known. NO REPEATS (owner rule): a story about the SAME',
+'event or topic is a repeat even with other words, another outlet or a small update. Follow-ups like "arrives",',
+'"begins tour", "comments again", "still falling", "talks continue" are repeats. Only a major NEW development counts',
+'(a new official decision, a new official number, a signed deal, a resignation). For every item give "event": a short',
+'English key of the underlying event (e.g. trump-asia-trip, nvidia-ceo-search, binance-hack); REUSE the key from the',
+'list below when it is the same event (such items are not sent).',
     done,
     '',
     'TASK: send EVERY HOUR at least ONE story: the strongest market story in the list that is confirmed by two outlets',
@@ -183,7 +188,7 @@ function buildPrompt(headlines, sent, market = {}) {
     '- title: max 10 words, starting with one emoji (📉/📈 price moves, 🏦 central banks or regulation,',
     '  🔐 hacks, 💵 US data, 🇨🇳 China, 🇺🇸 Trump/Washington, 💻 big tech, 💳 payments). Never write "عاجل" and never use the 🚨 emoji.',
     '- body: ONE short sentence (max 25 words) with the key detail. No source line, no advice, no hashtags.',
-    'Reply with JSON only: {"items":[{"title":"...","body":"...","refs":[1,7]}]}  (use {"items":[]} when nothing qualifies)'
+    'Reply with JSON only: {"items":[{"title":"...","body":"...","refs":[1,7],"event":"short-english-key"}]}  (use {"items":[]} when nothing qualifies)'
   ].join('\n');
 }
 
@@ -266,6 +271,10 @@ async function pick() {
     if (banned(x.title + ' ' + x.body)) { console.log('[alerts] skipped (Europe/Israel rule):', x.title); continue; }
     const dup = isRepeat(x.title, oldTitles.concat(picked.map(p => p.title)));
     if (dup) { console.log('[alerts] skipped as repeat of:', dup); continue; }
+const ev = String(x.event || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+if (ev && (sent.some(s => s.event === ev && now - (s.ts || 0) < 36 * 3600 * 1000) || picked.some(p => p.event === ev))) { console.log('[alerts] skipped (same event already sent):', ev, '-', x.title); continue; }
+const btcMove = t => /📉|📈/.test(t) && /بيتكوين|بتكوين|bitcoin|BTC/i.test(t);
+if (btcMove(x.title) && !(market.BTC && Math.abs(market.BTC.change || 0) >= 5) && sent.concat(picked).some(s => btcMove(s.title) && now - (s.ts || now) < 4 * 3600 * 1000)) { console.log('[alerts] skipped (Bitcoin move already sent in the last 4h):', x.title); continue; }
     const refs = [...new Set((Array.isArray(x.refs) ? x.refs : []).map(Number).filter(n => n >= 1 && n <= items.length))];
     const outlets = new Set(refs.map(n => outletOf(items[n - 1])));
     if (outlets.size < 2) { console.log('[alerts] skipped (not confirmed by 2 outlets):', x.title, '-', [...outlets].join(', ') || 'no refs'); continue; }
@@ -273,7 +282,7 @@ async function pick() {
     if (bad) { console.log('[alerts] skipped (price not verified):', x.title, '-', bad); continue; }
     let body = String(x.body).trim();
     if (market.BTC && /بيتكوين|بتكوين|bitcoin|BTC/i.test(x.title + ' ' + body)) body += '\nBTC ' + fmtP(market.BTC) + '$' + chg(market.BTC);
-    picked.push({ title: String(x.title).replace(/🚨\s*/g, '').replace(/عاجل\s*[:：]?\s*/g, '').replace(/\s+/g, ' ').trim(), body });
+    picked.push({ event: ev, title: String(x.title).replace(/🚨\s*/g, '').replace(/عاجل\s*[:：]?\s*/g, '').replace(/\s+/g, ' ').trim(), body });
     if (picked.length >= MAX_ITEMS) break;
   }
   }
@@ -289,7 +298,7 @@ async function send() {
   const sent = loadState();
   for (const it of picked) {
     await wa.sendToSelf({ text: '*' + it.title + '*\n' + it.body });
-    sent.push({ title: it.title, ts: Date.now() });
+    sent.push({ title: it.title, event: it.event || undefined, ts: Date.now() });
     saveState(sent);
   }
   console.log('[alerts] sent', picked.length, 'message(s)');

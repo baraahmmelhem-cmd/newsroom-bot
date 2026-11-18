@@ -204,7 +204,7 @@ async function resultFor(g) {
   try { heads = await headlinesSince(q, new Date(g.d.getTime() - 60000)); } catch (e) { console.log('[usdata] headlines failed', e.message); }
   console.log('[usdata]', q, '- headlines after release:', heads.length);
   if (!heads.length) return null;
-  const top = g.events.some(e => TOP_TIER.test(e.title));
+  const top = true; // owner rule 18 Nov: every US result goes to the newsroom and WhatsApp the moment it is confirmed
   let res;
   try { res = await gemini(resultPrompt(g, heads, top)); } catch (e) { console.log('[usdata]', e.message); return null; }
   if (!res || !res.found || !res.actuals || !Object.keys(res.actuals).length) { console.log('[usdata] result not in the news yet:', q); return null; }
