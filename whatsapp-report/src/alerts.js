@@ -178,7 +178,7 @@ function buildPrompt(headlines, sent, market = {}) {
     '- Trump statements or decisions that can move markets (tariffs, crypto, the dollar, the Fed, China).',
     '- Sudden breaking news: exchange hacks or collapses, big ETF flows, new US crypto laws or rulings.',
 'Topics allowed:',
-    '- Crypto: big BTC/ETH/XRP moves, major hacks, exchange news (Binance etc.), ETF flows, regulation (SEC, CFTC, Congress).',
+    '- Crypto: big moves of the owner's HALAL coins ONLY (BTC, ETH, XRP, SOL, XLM, BNB; never write about the price of any other coin or memecoin), major hacks, exchange news (Binance etc.), ETF flows, regulation (SEC, CFTC, Congress).',
     '- USA: Fed decisions, key data (CPI, jobs, GDP, PCE), Congress or White House decisions that move markets.',
     '- Trump: statements or decisions that move markets (tariffs, crypto, the dollar, the Fed).',
     '- China: economy, tariffs, US-China relations, the yuan, crypto policy.',
@@ -289,6 +289,8 @@ if (btcMove(x.title) && !(market.BTC && Math.abs(market.BTC.change || 0) >= 5) &
 if (outlets.size < 2 && !trusted) { console.log('[alerts] skipped (not confirmed by 2 outlets):', x.title, '-', [...outlets].join(', ') || 'no refs'); continue; }
     const bad = priceProblem(x, market);
     if (bad) { console.log('[alerts] skipped (price not verified):', x.title, '-', bad); continue; }
+// Owner rule 18 Nov: only halal coins (BTC, ETH, XRP, SOL, XLM, BNB). Stories about other coins are dropped.
+if (/\b(ADA|KAVA|DOGE|SHIB|PEPE|LTC|AVAX|TRX|TON|LINK|SUI|HYPE|ZEC|XMR|BCH|DOT|MATIC|UNI|AAVE|WIF|BONK|FLOKI)\b|(?:^|[\s(«"])(?:و|ب|ل)?(?:كاردانو|كافا|دوجكوين|دوج كوين|شيبا|بيبي|لايتكوين|أفالانش|ترون|تشينلينك|سوي|بولكادوت|بوليغون|يونيسواب)(?=$|[\s)»".,:،])|عملة ميم|عملات الميم/.test(x.title + ' ' + x.body)) { console.log('[alerts] skipped (not a halal coin):', x.title); continue; }
     let body = String(x.body).trim();
     if (market.BTC && /بيتكوين|بتكوين|bitcoin|BTC/i.test(x.title + ' ' + body)) body += '\nBTC ' + fmtP(market.BTC) + '$' + chg(market.BTC);
     picked.push({ event: ev, title: String(x.title).replace(/🚨\s*/g, '').replace(/عاجل\s*[:：]?\s*/g, '').replace(/\s+/g, ' ').trim(), body });
