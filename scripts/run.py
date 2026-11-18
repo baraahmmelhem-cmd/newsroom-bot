@@ -62,6 +62,10 @@ FEEDS = {
     "Al Jazeera Arabic": "https://www.aljazeera.net/aljazeerarss/a7c186be-1baa-4bd4-9d80-a84db769f779/73d0e1b4-532f-45ef-b135-bfdff8b8cab9",
     "Al Jazeera Economy": "https://news.google.com/rss/search?q=site%3Aaljazeera.net%2Febusiness%20when%3A2h&hl=ar&gl=EG&ceid=EG:ar",
     "Google News AI": "https://news.google.com/rss/search?q=(%22artificial%20intelligence%22%20OR%20OpenAI%20OR%20Anthropic%20OR%20%22AI%20chips%22%20OR%20Nvidia)%20(US%20OR%20China%20OR%20regulation%20OR%20launch%20OR%20ban)%20when%3A2h&hl=en-US&gl=US&ceid=US:en",
+    "Cointelegraph Arabic": "https://ar.cointelegraph.com/rss",
+    "Wu Blockchain": "https://wublock.substack.com/feed",
+    "Asharq Business": "https://news.google.com/rss/search?q=(site%3Aasharqbusiness.com%20OR%20site%3Aalarabiya.net%2Faswaq)%20when%3A2h&hl=ar&gl=EG&ceid=EG:ar",
+    "Reuters Bloomberg": "https://news.google.com/rss/search?q=(site%3Areuters.com%20OR%20site%3Abloomberg.com)%20(markets%20OR%20economy%20OR%20Fed%20OR%20bitcoin%20OR%20oil%20OR%20gold%20OR%20dollar)%20when%3A2h&hl=en-US&gl=US&ceid=US:en",
     "Al Jazeera": "https://www.aljazeera.com/xml/rss/all.xml",
 }
 
@@ -133,8 +137,8 @@ def fetch_headlines():
             print(f"Feed failed: {name}: {e}")
     items.sort()
     # Owner 18 Nov: 450 headlines made the model skip. Keep every Al Jazeera item plus the newest others, max 150 in all.
-    aj = [x for x in items if "[Al Jazeera" in x[1]]
-    rest = [x for x in items if "[Al Jazeera" not in x[1]]
+    aj = [x for x in items if any(t in x[1] for t in ("[Al Jazeera", "[Asharq", "[Cointelegraph Arabic"))]
+    rest = [x for x in items if not any(t in x[1] for t in ("[Al Jazeera", "[Asharq", "[Cointelegraph Arabic"))]
     items = sorted(aj + rest[:max(0, 150 - len(aj))])
     print(f"Fresh headlines (last {FRESH_HOURS}h):", len(items), flush=True)
     return "\n".join(f"[{i + 1}] " + row[2:] for i, (_, row) in enumerate(items[:40]))
@@ -199,7 +203,7 @@ def confirmed_outlets(item, headlines):
             src[int(m.group(1))] = s
     refs = item.get("refs") or []
     found = {src[int(r)] for r in refs if str(r).strip().isdigit() and int(r) in src}
-    if any("jazeera" in s or "الجزيرة" in s for s in found):
+    if any(k in s for s in found for k in ("jazeera", "الجزيرة", "reuters", "رويترز", "bloomberg", "بلومبرغ", "asharq", "الشرق", "cointelegraph arabic")):
         found.add("al jazeera (trusted source)")  # owner rule 18 Nov: Al Jazeera alone is enough
     return found
 
@@ -284,7 +288,7 @@ stocks and crypto. Pick the single story with the BIGGEST market impact right no
 
 CONFIRMATION RULE (owner, very important): choose a story ONLY if at least TWO different outlets in the list
 report the same event, and put the [numbers] of ALL those headlines in "refs". A story from one outlet only is not
-published, EXCEPT Al Jazeera: an Al Jazeera headline on our topics is enough on its own (owner rule).
+published, EXCEPT Al Jazeera: an Al Jazeera, Reuters, Bloomberg, Asharq or Cointelegraph Arabic headline on our topics is enough on its own (owner rule).
 FACTS: use ONLY facts present in the headlines and their summaries above (the text after " — "). Never invent numbers, names or quotes.
 If a detail is not in the headlines, leave it out.
 
