@@ -257,7 +257,7 @@ async function pick() {
   });
   const seen = new Set();
   items = items
-    .filter(h => { const age = (now - h.ts) / 60000; return age >= -10 && age <= (/^Al Jazeera/.test(h.source) ? 360 : FRESH_MIN) && !banned(h.title); // Al Jazeera: last 6 h (owner), repeats are still skipped })
+    .filter(h => { const age = (now - h.ts) / 60000; return age >= -10 && age <= (/^Al Jazeera/.test(h.source) ? 360 : FRESH_MIN) && !banned(h.title); })
     .sort((a, b) => b.ts - a.ts)
     .filter(h => { const k = h.title.toLowerCase().slice(0, 70); if (seen.has(k)) return false; seen.add(k); return true; })
     .filter((h, i) => i < 60 || /^Al Jazeera/.test(h.source));
