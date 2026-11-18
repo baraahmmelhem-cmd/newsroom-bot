@@ -16,7 +16,7 @@ concurrency:
 jobs:
   watch:
     runs-on: ubuntu-latest
-    timeout-minutes: 100
+    timeout-minutes: 130
     env:
       WHATSAPP_PHONE: ${{ secrets.WHATSAPP_PHONE }}
       SESSION_KEY: ${{ secrets.SESSION_KEY }}
