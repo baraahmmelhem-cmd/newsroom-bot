@@ -503,6 +503,17 @@ def recently_posted():
         return False
 
 
+# Owner 19 Nov: economy and markets only. No sports, no wars, no Africa.
+SPORT_AFRICA = re.compile(r"الصومال|السودان|ليبيا|تونس|الجزائر|المغرب|موريتانيا|مصر(?!ف)|إثيوبيا|أفريقيا|إفريقيا|لاعب|منتخب|مباراة|كأس|الدوري|بطولة|ميدالية|أولمبي|رياضي|النادي|الفيفا")
+WAR = re.compile(r"حرب|الحرب|قصف|غارة|غارات|اشتباك|قتلى|قتيل|جرحى|مسلح|ميليشيا|صاروخ|صواريخ|مسيرات|عسكري|الجيش|جنود|هدنة|انفجار|اغتيال|معارك")
+MARKET_WORDS = re.compile(r"النفط|نفط|برنت|الخام|أسعار|الأسواق|الأسهم|الدولار|بيتكوين|الذهب")
+
+
+def off_topic(title):
+    t = title or ""
+    return bool(SPORT_AFRICA.search(t) or (WAR.search(t) and not MARKET_WORDS.search(t)))
+
+
 def main():
     global FRESH_HOURS, MUST
     if os.environ.get("GITHUB_EVENT_NAME") == "schedule" and recently_posted():
@@ -541,6 +552,13 @@ def main():
     if banned(item.get("title", "") + " " + item.get("body", "")):
         print("Skipped (Europe/Israel rule):", item.get("title"))
         return
+    if off_topic(item.get("title", "")):
+        print("Off-topic (sports/war/Africa), asking once more:", item.get("title"), flush=True)
+        time.sleep(5)
+        item = write_item(headlines, posted + [item.get("title", "")], btc, force=True)
+        if item.get("skip") or off_topic(item.get("title", "")):
+            print("Still off-topic; nothing published.")
+            return
     if not allow_urgent(item):
         if item.get("category") == "عاجل":
             txt = item.get("title", "") + item.get("body", "")
