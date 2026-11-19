@@ -508,10 +508,13 @@ SPORT_AFRICA = re.compile(r"الصومال|السودان|ليبيا|تونس|ا
 WAR = re.compile(r"حرب|الحرب|قصف|غارة|غارات|اشتباك|قتلى|قتيل|جرحى|مسلح|ميليشيا|صاروخ|صواريخ|مسيرات|عسكري|الجيش|جنود|هدنة|انفجار|اغتيال|معارك|المفقود|مفقود|البحار|بحار|والد|والدة|عائلة|أسرة|طفل|أطفال|ضحايا|عصيبة|يروي|تروي|قصة")
 MARKET_WORDS = re.compile(r"النفط|نفط|برنت|الخام|أسعار|الأسواق|الأسهم|الدولار|بيتكوين|الذهب|الشحن|ناقلات")
 
+QUESTION = re.compile(r"[؟?]|^(هل|كيف|لماذا|ماذا|ما هي|ما هو|ما الذي|متى|أين|من هو|من هي|إليك|دليل|نصائح|خطوات|تعرف على)\s")
+
 
 def off_topic(title):
     t = title or ""
-    return bool(SPORT_AFRICA.search(t) or (WAR.search(t) and not MARKET_WORDS.search(t)))
+    q = re.sub(r"^[^\u0621-\u064Aa-zA-Z]+", "", t).strip()
+    return bool(QUESTION.search(q) or SPORT_AFRICA.search(t) or (WAR.search(t) and not MARKET_WORDS.search(t)))
 
 
 def main():
