@@ -59,14 +59,14 @@ FEEDS = {
     "Google News China": "https://news.google.com/rss/search?q=China%20(economy%20OR%20tariffs%20OR%20yuan%20OR%20trade)%20when%3A2h&hl=en-US&gl=US&ceid=US:en",
     "Google News Big Tech": "https://news.google.com/rss/search?q=(Apple%20OR%20Google%20OR%20Microsoft%20OR%20Nvidia%20OR%20Meta%20OR%20Amazon%20OR%20Tesla%20OR%20OpenAI)%20(outage%20OR%20CEO%20OR%20launches%20OR%20lawsuit%20OR%20earnings%20OR%20antitrust)%20when%3A2h&hl=en-US&gl=US&ceid=US:en",
     "Google News Payments": "https://news.google.com/rss/search?q=(%22Apple%20Pay%22%20OR%20%22Google%20Pay%22%20OR%20Visa%20OR%20Mastercard%20OR%20PayPal%20OR%20Stripe%20OR%20%22crypto%20payments%22%20OR%20%22buy%20bitcoin%22)%20when%3A2h&hl=en-US&gl=US&ceid=US:en",
-    "Al Jazeera Arabic": "https://www.aljazeera.net/aljazeerarss/a7c186be-1baa-4bd4-9d80-a84db769f779/73d0e1b4-532f-45ef-b135-bfdff8b8cab9",
+    "Al Jazeera Arabic": "https://news.google.com/rss/search?q=(site%3Aaljazeera.net%2Febusiness%20OR%20site%3Aaljazeera.net%2Ftech)%20when%3A3h&hl=ar&gl=EG&ceid=EG:ar",
     "Al Jazeera Economy": "https://news.google.com/rss/search?q=site%3Aaljazeera.net%2Febusiness%20when%3A2h&hl=ar&gl=EG&ceid=EG:ar",
     "Google News AI": "https://news.google.com/rss/search?q=(%22artificial%20intelligence%22%20OR%20OpenAI%20OR%20Anthropic%20OR%20%22AI%20chips%22%20OR%20Nvidia)%20(US%20OR%20China%20OR%20regulation%20OR%20launch%20OR%20ban)%20when%3A2h&hl=en-US&gl=US&ceid=US:en",
     "Cointelegraph Arabic": "https://ar.cointelegraph.com/rss",
     "Wu Blockchain": "https://wublock.substack.com/feed",
     "Asharq Business": "https://news.google.com/rss/search?q=(site%3Aasharqbusiness.com%20OR%20site%3Aalarabiya.net%2Faswaq)%20when%3A2h&hl=ar&gl=EG&ceid=EG:ar",
     "Reuters Bloomberg": "https://news.google.com/rss/search?q=(site%3Areuters.com%20OR%20site%3Abloomberg.com)%20(markets%20OR%20economy%20OR%20Fed%20OR%20bitcoin%20OR%20oil%20OR%20gold%20OR%20dollar)%20when%3A2h&hl=en-US&gl=US&ceid=US:en",
-    "Al Jazeera": "https://www.aljazeera.com/xml/rss/all.xml",
+    "Al Jazeera": "https://news.google.com/rss/search?q=(site%3Aaljazeera.com%2Feconomy%20OR%20site%3Aaljazeera.com%2Ftag%2Ftechnology%20OR%20site%3Aaljazeera.com%2Ftag%2Fbusiness-and-economy)%20when%3A3h&hl=en-US&gl=US&ceid=US:en",
 }
 
 
