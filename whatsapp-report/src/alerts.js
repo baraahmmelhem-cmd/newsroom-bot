@@ -37,8 +37,8 @@ const FEEDS = {
   'Google News Crypto': GN + encodeURIComponent('(bitcoin OR crypto OR Binance) when:2h'),
 'Google News AI': GN + encodeURIComponent('("artificial intelligence" OR OpenAI OR Anthropic OR "AI chips" OR Nvidia) (US OR China OR regulation OR launch OR ban) when:2h'),
 // Al Jazeera is the owner's reference source (18 Nov): English, Arabic and the Arabic economy section.
-'Al Jazeera': 'https://www.aljazeera.com/xml/rss/all.xml',
-'Al Jazeera Arabic': 'https://www.aljazeera.net/aljazeerarss/a7c186be-1baa-4bd4-9d80-a84db769f779/73d0e1b4-532f-45ef-b135-bfdff8b8cab9',
+'Al Jazeera': 'https://news.google.com/rss/search?q=' + encodeURIComponent('(site:aljazeera.com/economy OR site:aljazeera.com/tag/technology OR site:aljazeera.com/tag/business-and-economy) when:2h') + '&hl=en-US&gl=US&ceid=US:en',
+'Al Jazeera Arabic': 'https://news.google.com/rss/search?q=' + encodeURIComponent('(site:aljazeera.net/ebusiness OR site:aljazeera.net/tech) when:2h') + '&hl=ar&gl=EG&ceid=EG:ar',
 'Arabic Economy': 'https://news.google.com/rss/search?q=' + encodeURIComponent('(site:aljazeera.net/ebusiness OR site:asharqbusiness.com OR site:alarabiya.net/aswaq) when:2h') + '&hl=ar&gl=EG&ceid=EG:ar',
 'Cointelegraph Arabic': 'https://ar.cointelegraph.com/rss',
 'Wu Blockchain': 'https://wublock.substack.com/feed',
