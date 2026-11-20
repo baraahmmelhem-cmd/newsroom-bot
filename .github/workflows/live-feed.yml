@@ -1,12 +1,11 @@
 # .github/workflows/live-feed.yml
 # Builds the live-platform feed (what the bot published on the site and on WhatsApp + the run
 # history) and sends it to the Mr_Amwal Live platform, which then notifies every subscribed phone.
-# Runs every 10 minutes and right after any other workflow finishes.  No secrets needed: the
-# platform verifies the job's own GITHUB_TOKEN against this repository.
+# Runs right after the other workflows finish (no cron: the platform refreshes Al Jazeera itself).
+# Authentication: the job's GitHub OIDC token (signed by GitHub, repository claim checked by the
+# platform), so it is safe on a public repository and needs no secret.
 name: Live feed
 on:
-  # No cron on purpose (GitHub Actions minutes are limited): the platform refreshes Al Jazeera by
-  # itself, and newsroom/WhatsApp data only changes when the workflows below finish.
   workflow_dispatch:
   workflow_run:
     workflows: ["Hourly news", "WhatsApp Breaking News", "WhatsApp Morning Report", "WhatsApp Manual Message", "WhatsApp Economic Calendar", "US Data Watch", "WhatsApp to site"]
@@ -17,6 +16,7 @@ concurrency:
 permissions:
   contents: read
   actions: read
+  id-token: write
 env:
   LIVE_URL: https://mr-amwal-live.baraah-m-melhem.workers.dev
 jobs:
@@ -33,9 +33,9 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: python scripts/build_feed.py
       - name: Send feed to the live platform
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          OIDC=$(curl -sS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=mr-amwal-live" | python3 -c 'import sys,json; print(json.load(sys.stdin)["value"])')
           curl -sS --fail-with-body -X POST "$LIVE_URL/api/feed" \
-            -H "content-type: application/json" -H "x-github-token: $GITHUB_TOKEN" \
+            -H "content-type: application/json" -H "x-github-oidc: $OIDC" \
             --data-binary @app/feed.json
