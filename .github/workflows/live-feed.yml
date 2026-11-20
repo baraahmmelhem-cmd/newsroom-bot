@@ -5,8 +5,8 @@
 # platform verifies the job's own GITHUB_TOKEN against this repository.
 name: Live feed
 on:
-  schedule:
-    - cron: "17 * * * *"   # hourly safety net; the workflow_run triggers below give the real-time updates
+  # No cron on purpose (GitHub Actions minutes are limited): the platform refreshes Al Jazeera by
+  # itself, and newsroom/WhatsApp data only changes when the workflows below finish.
   workflow_dispatch:
   workflow_run:
     workflows: ["Hourly news", "WhatsApp Breaking News", "WhatsApp Morning Report", "WhatsApp Manual Message", "WhatsApp Economic Calendar", "US Data Watch", "WhatsApp to site"]
