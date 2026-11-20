@@ -85,8 +85,8 @@ function dateAr(d) {
 function important(e) {
   if (e.country !== 'USD') return false;
   if (e.impact === 'High') return true;
-  // a few Medium items that traders still watch closely
-  return e.impact === 'Medium' && /fomc|powell|fed chair|core pce|jolts|unemployment claims/i.test(e.title);
+  // Owner 20 Nov: every Medium US event too (consumer sentiment, Fed speakers, PMIs...).
+  return e.impact === 'Medium';
 }
 
 async function loadEvents() {
