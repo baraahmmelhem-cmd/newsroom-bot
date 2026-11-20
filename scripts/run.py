@@ -6,6 +6,7 @@ Arabic item -> publish to the newsroom API -> remember it in posted.json.
 
 All secrets come from environment variables (GitHub Actions Secrets).
 """
+import re
 import json
 import os
 import sys
