@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import re
 """Hourly Arabic crypto/economy news -> Mr_Amwal newsroom.
 
 Flow: fetch headlines -> ask Claude to pick the strongest NEW story and write the
