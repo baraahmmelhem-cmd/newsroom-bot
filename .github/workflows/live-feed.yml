@@ -4,9 +4,13 @@
 # Runs every 10 minutes and right after any other workflow finishes.  No secrets needed: the
 # platform verifies the job's own GITHUB_TOKEN against this repository.
 name: Live feed
-# Owner 20 Nov: stopped (it used up the free GitHub minutes). Manual only.
 on:
+  schedule:
+    - cron: "17 * * * *"   # hourly safety net; the workflow_run triggers below give the real-time updates
   workflow_dispatch:
+  workflow_run:
+    workflows: ["Hourly news", "WhatsApp Breaking News", "WhatsApp Morning Report", "WhatsApp Manual Message", "WhatsApp Economic Calendar", "US Data Watch", "WhatsApp to site"]
+    types: [completed]
 concurrency:
   group: live-feed
   cancel-in-progress: true
