@@ -221,12 +221,21 @@ def _direction(s):
 
 def _words(s):
     import re
-    stop = {"في", "من", "إلى", "على", "بعد", "مع", "عن", "فوق", "دولار", "عاجل", "ألف", "مليون",
+    stop = {"في", "من", "الى", "على", "بعد", "مع", "عن", "فوق", "دولار", "عاجل", "الف", "مليون",
             "مليار", "the", "a", "to"}
+    # Owner 20 Nov: same story reworded must count as a repeat (إنفيديا/انفيديا, تحقيق/تحقيقاً).
+    s = re.sub("[ً-ْ]", "", s.lower())  # drop Arabic diacritics
+    s = re.sub("[أإآ]", "ا", s).replace("ة", "ه").replace("ى", "ي")
     out = set()
-    for w in re.findall(r"\d+|[\w؀-ۿ]{3,}", s.lower()):
+    for w in re.findall(r"\d+|[\w؀-ۿ]{3,}", s):
+        if w.endswith("اً") or (len(w) > 4 and w.endswith("ا") and w[-2] in "قبتنرل"):
+            w = w[:-1]
+        if len(w) > 5 and w[0] in "وفبل" and w[1:3] == "ال":
+            w = w[1:]  # والأسواق -> الأسواق
         if w.startswith("ال") and len(w) > 4:
-            w = w[2:]  # الانتخابات -> انتخابات
+            w = w[2:]
+        if len(w) > 4 and w[0] == "و":
+            w = w[1:]  # ومغادرة -> مغادره
         if w not in stop:
             out.add(w)
     return out
