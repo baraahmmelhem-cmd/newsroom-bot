@@ -131,7 +131,7 @@ function priceProblem(x, m) {
   const btcNums = nums.filter(n => n >= 10000 && n <= 300000);
   if (!btc) return btcNums.length ? 'Bitcoin price could not be verified by 2 sources' : null;
   for (const n of btcNums) {
-    if (Math.abs(n - btc.price) / btc.price > 0.04) return 'BTC figure ' + n + ' but verified price is ' + Math.round(btc.price);
+    if (Math.abs(n - btc.price) / btc.price > 0.015) return 'BTC figure ' + n + ' but verified price is ' + Math.round(btc.price);
   }
   if (btc.change != null && Math.abs(btc.change) < 2.5 && /بشدة|حاد|حادة|انهيار|تنهار|ينهار|تقفز|يقفز|قفزة|بقوة/.test(x.title)) {
     return 'calls a sharp move but live 24h change is ' + btc.change.toFixed(1) + '%';
@@ -338,7 +338,11 @@ async function send() {
   if (!picked.length) return;
   const wa = require('./send');
   const sent = loadState();
+  // Owner 21 Nov: check the live Bitcoin price again right before sending; skip if it moved more than 1.5%.
+  const market = await livePrices();
   for (const it of picked) {
+    const pp = priceProblem(it, market);
+    if (pp) { console.log('[alerts] price moved before send, skipped:', it.title, '-', pp); continue; }
     await wa.sendToSelf({ text: '*' + it.title + '*\n' + it.body });
     sent.push({ title: it.title, event: it.event || undefined, ts: Date.now() });
     saveState(sent);
