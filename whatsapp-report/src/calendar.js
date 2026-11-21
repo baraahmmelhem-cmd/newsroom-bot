@@ -104,6 +104,29 @@ async function loadEvents() {
       console.log('[calendar] feed failed:', url, err.message);
     }
   }
+  // Owner 21 Nov: Forex Factory has no next-week feed (404), so the Saturday week-ahead was empty.
+  // Fill every day Forex Factory does not cover from TradingView's economic calendar.
+  try {
+    const have = new Set(all.map(e => e.d.toISOString().slice(0, 10)));
+    const from = new Date(Date.now() - 12 * 3600000);
+    const to = new Date(Date.now() + 9 * 86400000);
+    const tv = 'https://economic-calendar.tradingview.com/events?from=' + from.toISOString() + '&to=' + to.toISOString() + '&countries=US';
+    const r = await fetch(tv, { headers: { 'Origin': 'https://www.tradingview.com', 'Referer': 'https://www.tradingview.com/', 'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120 Safari/537.36' }, signal: AbortSignal.timeout(20000) });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const list = (await r.json()).result || [];
+    let added = 0;
+    for (const x of list) {
+      const d = new Date(x.date);
+      if (isNaN(d) || have.has(d.toISOString().slice(0, 10))) continue;
+      if (x.importance < 0 || /auction|bill|bid-to-cover|allotted/i.test(x.title)) continue;
+      all.push({ title: x.title, country: 'USD', date: x.date, impact: x.importance >= 1 ? 'High' : 'Medium',
+        forecast: x.forecast == null ? '' : String(x.forecast), previous: x.previous == null ? '' : String(x.previous), d });
+      added++;
+    }
+    console.log('[calendar] TradingView added', added, 'events');
+  } catch (err) {
+    console.log('[calendar] TradingView failed:', err.message);
+  }
   const seen = new Set();
   return all
     .sort((a, b) => a.d - b.d)
