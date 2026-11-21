@@ -115,11 +115,24 @@ async function loadEvents() {
     if (!r.ok) throw new Error('HTTP ' + r.status);
     const list = (await r.json()).result || [];
     let added = 0;
+    // Owner 21 Nov: one line per release (no MoM/YoY/sub-index repeats), high and medium only.
+    const tvBase = s => String(s || '')
+      .replace(/S&P\/Case-Shiller.*$/i, 'S&P/Case-Shiller Home Price')
+      .replace(/House Price Index.*$/i, 'House Price Index')
+      .replace(/S&P Global (Manufacturing|Services|Composite) PMI/i, 'S&P Global PMI')
+      .replace(/\b(MoM|YoY|QoQ|Annualized|Ex[ -]\w+.*|s\.?a\.?|n\.?s\.?a\.?|Total|Rate)\b/gi, '')
+      .replace(/\s+/g, ' ').trim();
+    const tvSeen = new Set();
+    list.sort((a, b) => (b.importance || 0) - (a.importance || 0));
     for (const x of list) {
       const d = new Date(x.date);
       if (isNaN(d) || have.has(d.toISOString().slice(0, 10))) continue;
-      if (x.importance < 0 || /auction|bill|bid-to-cover|allotted/i.test(x.title)) continue;
-      all.push({ title: x.title, country: 'USD', date: x.date, impact: x.importance >= 1 ? 'High' : 'Medium',
+      if (x.importance < 0 || /auction|bill|bid-to-cover|allotted|purchases/i.test(x.title)) continue;
+      const base = tvBase(x.title);
+      const key = base + '|' + d.toISOString().slice(0, 13);
+      if (tvSeen.has(key)) continue;
+      tvSeen.add(key);
+      all.push({ title: base, country: 'USD', date: x.date, impact: x.importance >= 1 ? 'High' : 'Medium',
         forecast: x.forecast == null ? '' : String(x.forecast), previous: x.previous == null ? '' : String(x.previous), d });
       added++;
     }
