@@ -67,6 +67,10 @@ FEEDS = {
     "Cointelegraph Arabic": "https://ar.cointelegraph.com/rss",
     "Wu Blockchain": "https://wublock.substack.com/feed",
     "Asharq Business": "https://news.google.com/rss/search?q=(site%3Aasharqbusiness.com%20OR%20site%3Aalarabiya.net%2Faswaq)%20when%3A2h&hl=ar&gl=EG&ceid=EG:ar",
+    "CoinDesk": "https://www.coindesk.com/arc/outboundfeeds/rss/",
+    "Decrypt": "https://decrypt.co/feed",
+    "The Block": "https://www.theblock.co/rss.xml",
+    "Cointelegraph": "https://cointelegraph.com/rss",
     "Reuters Bloomberg": "https://news.google.com/rss/search?q=(site%3Areuters.com%20OR%20site%3Abloomberg.com)%20(markets%20OR%20economy%20OR%20Fed%20OR%20bitcoin%20OR%20oil%20OR%20gold%20OR%20dollar)%20when%3A2h&hl=en-US&gl=US&ceid=US:en",
     "Al Jazeera": "https://news.google.com/rss/search?q=(site%3Aaljazeera.com%2Feconomy%20OR%20site%3Aaljazeera.com%2Ftag%2Ftechnology%20OR%20site%3Aaljazeera.com%2Ftag%2Fbusiness-and-economy)%20when%3A3h&hl=en-US&gl=US&ceid=US:en",
 }
@@ -515,7 +519,7 @@ def recently_posted():
 
 
 # Owner 19 Nov: economy and markets only. No sports, no wars, no Africa.
-SPORT_AFRICA = re.compile(r"الصومال|السودان|ليبيا|تونس|الجزائر|المغرب|موريتانيا|مصر(?!ف)|إثيوبيا|أفريقيا|إفريقيا|لاعب|منتخب|مباراة|كأس|الدوري|بطولة|ميدالية|أولمبي|رياضي|النادي|الفيفا|تتويج|التتويج|ذهبية|ذهبيتين|فضية|برونزية|بطل|بطلة")
+SPORT_AFRICA = re.compile(r"الصومال|السودان|ليبيا|تونس|الجزائر|المغرب|موريتانيا|مصر(?!ف)|إثيوبيا|أفريقيا|إفريقيا|لاعب|منتخب|مباراة|كأس|الدوري|بطولة|ميدالية|أولمبي|رياضي|النادي|الفيفا|تتويج|التتويج|ذهبية|ذهبيتين|فضية|برونزية|بطل|بطلة|المصري|المصرية|شلاتين|القاهرة|السويس")
 WAR = re.compile(r"حرب|الحرب|قصف|غارة|غارات|اشتباك|قتلى|قتيل|جرحى|مسلح|ميليشيا|صاروخ|صواريخ|مسيرات|عسكري|الجيش|جنود|هدنة|انفجار|اغتيال|معارك|المفقود|مفقود|البحار|بحار|والد|والدة|عائلة|أسرة|طفل|أطفال|ضحايا|عصيبة|يروي|تروي|قصة")
 MARKET_WORDS = re.compile(r"النفط|نفط|برنت|الخام|أسعار|الأسواق|الأسهم|الدولار|بيتكوين|الذهب|الشحن|ناقلات")
 
