@@ -127,7 +127,11 @@ async function loadEvents() {
     for (const x of list) {
       const d = new Date(x.date);
       if (isNaN(d) || have.has(d.toISOString().slice(0, 10))) continue;
-      if (x.importance < 0 || /auction|bill|bid-to-cover|allotted|purchases/i.test(x.title)) continue;
+      // Owner 21 Nov: compact week list, drop weekly/sub-item noise, keep EIA crude only.
+      const NOISE = /auction|bill|bid-to-cover|allotted|purchases|\bMBA\b|mortgage|\bAPI\b|ethanol|gasoline|distillate|heating oil|cushing|refinery|exports|imports|inventor|stocks? change|USDA|Chicago Fed|ADP Weekly|ADP Employment Change Weekly|House Price Index|continuing|ex[ -]transp|^PCE Price Index/i;
+      const KEEP = /^(EIA )?crude oil (inventories|stocks? change)$/i;
+      const tt = String(x.title || '').trim();
+      if (x.importance < 0 || (NOISE.test(tt) && !KEEP.test(tt))) continue;
       const base = tvBase(x.title);
       const key = base + '|' + d.toISOString().slice(0, 13);
       if (tvSeen.has(key)) continue;
