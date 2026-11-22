@@ -277,7 +277,11 @@ const results = await Promise.allSettled(names.map((n, i) => new Promise(r => se
   const picked = [];
   const tried = [];
   // Owner rule (17 Nov): one confirmed story every hour. If round 1 gives nothing that passes the checks, ask once more.
+  // Owner 22 Nov: headlines behind a rejected repeat are removed before the next round, so the model must pick another story.
+  const dropIdx = new Set();
+  const refsOf = x => (Array.isArray(x && x.refs) ? x.refs : []).map(Number).filter(n => n >= 1 && n <= items.length);
   for (let round = 1; round <= 4 && !picked.length; round++) {
+  if (dropIdx.size) { items = items.filter((h, k) => !dropIdx.has(k + 1)); console.log('[alerts] removed headlines of rejected repeats:', dropIdx.size, 'left:', items.length); dropIdx.clear(); }
   const extra = round === 1 ? '' : '\nIMPORTANT: these earlier picks were REJECTED because they were already sent before or failed the checks. Do NOT return them again and do NOT return the same event in other words: (' + (tried.join(' | ') || 'none') + '). Pick a DIFFERENT event from the list. Choose the next-best story that IS reported by at least two different outlets in the list and is not a repeat; use {"items":[]} only if truly nothing qualifies.';
   const res = await askGemini(buildPrompt(items, sent, market) + extra);
   for (const x of (res && res.items) || []) {
@@ -285,11 +289,11 @@ const results = await Promise.allSettled(names.map((n, i) => new Promise(r => se
     if (!x || !x.title || !x.body) continue;
     if (banned(x.title + ' ' + x.body)) { console.log('[alerts] skipped (Europe/Israel rule):', x.title); continue; }
     const dup = isRepeat(x.title, oldTitles.concat(picked.map(p => p.title)));
-    if (dup) { console.log('[alerts] skipped as repeat of:', dup); continue; }
+    if (dup) { refsOf(x).forEach(n => dropIdx.add(n)); console.log('[alerts] skipped as repeat of:', dup); continue; }
 const ev = String(x.event || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
-if (ev && (sent.some(s => s.event === ev && now - (s.ts || 0) < 36 * 3600 * 1000) || picked.some(p => p.event === ev))) { console.log('[alerts] skipped (same event already sent):', ev, '-', x.title); continue; }
+if (ev && (sent.some(s => s.event === ev && now - (s.ts || 0) < 36 * 3600 * 1000) || picked.some(p => p.event === ev))) { refsOf(x).forEach(n => dropIdx.add(n)); console.log('[alerts] skipped (same event already sent):', ev, '-', x.title); continue; }
 const btcMove = t => /📉|📈/.test(t) && /بيتكوين|بتكوين|bitcoin|BTC/i.test(t);
-if (btcMove(x.title) && !(market.BTC && Math.abs(market.BTC.change || 0) >= 5) && sent.concat(picked).some(s => btcMove(s.title) && now - (s.ts || now) < 4 * 3600 * 1000)) { console.log('[alerts] skipped (Bitcoin move already sent in the last 4h):', x.title); continue; }
+if (btcMove(x.title) && !(market.BTC && Math.abs(market.BTC.change || 0) >= 5) && sent.concat(picked).some(s => btcMove(s.title) && now - (s.ts || now) < 4 * 3600 * 1000)) { refsOf(x).forEach(n => dropIdx.add(n)); console.log('[alerts] skipped (Bitcoin move already sent in the last 4h):', x.title); continue; }
     const refs = [...new Set((Array.isArray(x.refs) ? x.refs : []).map(Number).filter(n => n >= 1 && n <= items.length))];
     const outlets = new Set(refs.map(n => outletOf(items[n - 1])));
     const trusted = [...outlets].some(o => /jazeera|الجزيرة|reuters|رويترز|bloomberg|بلومبرغ|asharq|الشرق|cointelegraph arabic/i.test(o));
