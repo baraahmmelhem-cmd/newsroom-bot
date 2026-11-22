@@ -277,8 +277,8 @@ const results = await Promise.allSettled(names.map((n, i) => new Promise(r => se
   const picked = [];
   const tried = [];
   // Owner rule (17 Nov): one confirmed story every hour. If round 1 gives nothing that passes the checks, ask once more.
-  for (let round = 1; round <= 2 && !picked.length; round++) {
-  const extra = round === 1 ? '' : '\nIMPORTANT: none of your earlier picks passed the checks (' + (tried.join(' | ') || 'none') + '). Choose the next-best story that IS reported by at least two different outlets in the list and is not a repeat; use {"items":[]} only if truly nothing qualifies.';
+  for (let round = 1; round <= 4 && !picked.length; round++) {
+  const extra = round === 1 ? '' : '\nIMPORTANT: these earlier picks were REJECTED because they were already sent before or failed the checks. Do NOT return them again and do NOT return the same event in other words: (' + (tried.join(' | ') || 'none') + '). Pick a DIFFERENT event from the list. Choose the next-best story that IS reported by at least two different outlets in the list and is not a repeat; use {"items":[]} only if truly nothing qualifies.';
   const res = await askGemini(buildPrompt(items, sent, market) + extra);
   for (const x of (res && res.items) || []) {
     if (x && x.title) tried.push(String(x.title));
