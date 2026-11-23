@@ -284,12 +284,12 @@ async function buildDaily() {
   for (const k of ["headline", "what", "econ", "next_date", "next_event"]) if (!j[k] || !String(j[k]).trim()) throw new Error("model left " + k + " empty");
   const clean = v => (v == null || /^(null|none|لا يوجد|-)$/i.test(String(v).trim())) ? null : String(v).trim();
 
-  const lines = ["📰 الخبر في 3 أسطر", "🔴 " + j.headline.trim(), "", "❓ 1) ماذا حدث؟", j.what.trim(), "", "🧠 2) لماذا يهم؟", "💰 اقتصادياً: " + j.econ.trim()];
-  if (clean(j.politics)) lines.push("🏛 سياسياً: " + clean(j.politics));
-  lines.push("", "👀 3) ماذا نراقب؟");
+  const lines = ["الخبر في 3 أسطر", (/بيتكوين/.test(j.headline) ? "₿ " : "") + j.headline.trim(), "", "1) ماذا حدث؟", j.what.trim(), "", "2) لماذا يهم؟", "اقتصادياً: " + j.econ.trim()];
+  if (clean(j.politics)) lines.push("سياسياً: " + clean(j.politics));
+  lines.push("", "3) ماذا نراقب؟");
   if (clean(j.dollar)) lines.push("💵 الدولار: " + clean(j.dollar));
-  if (clean(j.bonds)) lines.push("📉 السندات: " + clean(j.bonds));
-  lines.push("🗓 " + j.next_date.trim() + ": " + j.next_event.trim(), "", "ℹ️ " + DISCLAIMER);
+  if (clean(j.bonds)) lines.push("📈 السندات: " + clean(j.bonds));
+  lines.push("🗓 " + j.next_date.trim() + ": " + j.next_event.trim(), "", DISCLAIMER);
   const draft = lines.join("\n");
 
   const pickRefs = r => (Array.isArray(r) ? r : []).map(n => heads[Number(n) - 1]).filter(Boolean);
@@ -421,16 +421,16 @@ async function buildWeekly() {
   const pol = j.politics && !/^(null|none)$/i.test(String(j.politics).trim()) ? String(j.politics).trim() : null;
 
   const lines = [
-    "📊 أسبوع الكريبتو بـ 5 أرقام", "🗓 من " + w.monAr + " إلى " + w.friAr, "",
-    "1️⃣ رقم الأسبوع: " + j.n1_label.trim(),
-    "2️⃣ تدفقات صناديق ETF للبيتكوين: " + n2,
-    "3️⃣ مؤشر الدولار DXY: " + n3,
-    "4️⃣ عائد السندات الأميركية 10 سنوات: " + n4,
-    "5️⃣ مؤشر الخوف والطمع: " + n5,
-    "", "🧠 قراءة Mr_Amwal", j.read1.trim(), j.read2.trim()
+    "أسبوع الكريبتو بـ 5 أرقام", "من " + w.monAr + " إلى " + w.friAr, "",
+    "1) ₿ رقم الأسبوع: " + j.n1_label.trim(),
+    "2) 🏦 تدفقات صناديق ETF للبيتكوين: " + n2,
+    "3) 💵 مؤشر الدولار DXY: " + n3,
+    "4) 📈 عائد السندات الأميركية 10 سنوات: " + n4,
+    "5) 😨 مؤشر الخوف والطمع: " + n5,
+    "", "قراءة Mr_Amwal", j.read1.trim(), j.read2.trim()
   ];
-  if (pol) lines.push("🏛 سياسياً: " + pol);
-  lines.push("👀 نراقب: " + j.watch.trim().replace(/^نراقب:?\s*/, ""), "", "ℹ️ " + DISCLAIMER);
+  if (pol) lines.push("سياسياً: " + pol);
+  lines.push("نراقب: " + j.watch.trim().replace(/^نراقب:?\s*/, ""), "", DISCLAIMER);
 
   const srcs = (j.refs || []).map(n => heads[Number(n) - 1]).filter(Boolean);
   const blob = data.join("\n") + "\n" + calLines.join("\n") + "\n" + heads.map(h => h.title).join("\n");
