@@ -1,5 +1,6 @@
 name: Telegram Drafts
 # Owner 23 Nov 2026 — 4-week Telegram trial. DRAFTS ONLY for human review; nothing is published anywhere.
+# Owner 23 Nov: sent at 18:15 Amman (waits ~13 min after the 18:00 Hourly news run so it never mixes with the hourly alert).
 # Sun-Fri 18:00 Amman (15:00 UTC): "الخبر في 3 أسطر".  Saturday 18:00 Amman: "أسبوع الكريبتو بـ 5 أرقام".
 # GitHub schedule: crons never fire in this repo, so this hangs off "Hourly news" (dispatched every hour)
 # and runs only on the 15:00 UTC one. telegram-state.json stops a second send on the same day.
@@ -18,6 +19,10 @@ on:
         description: "send even if a draft already went today (true/false)"
         required: false
         default: "false"
+      dry:
+        description: "true = build only, send NOTHING to WhatsApp (the card is saved as an artifact)"
+        required: false
+        default: "true"
 
 permissions:
   contents: write
@@ -48,15 +53,18 @@ jobs:
     needs: gate
     if: ${{ needs.gate.outputs.mode == 'daily' || needs.gate.outputs.mode == 'weekly' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 40
     env:
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
       GREENAPI_API_TOKEN: ${{ secrets.GREENAPI_API_TOKEN }}
-      PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
     defaults:
       run:
         working-directory: whatsapp-report
     steps:
+      - name: Wait until 18:15 Amman (scheduled runs only)
+        if: ${{ github.event_name == 'workflow_run' }}
+        working-directory: .
+        run: sleep 780
       - uses: actions/checkout@v4
         with:
           ref: main
@@ -70,12 +78,29 @@ jobs:
           key: wa-node-${{ hashFiles('whatsapp-report/package.json') }}
       - name: Install
         run: '[ -d node_modules ] || npm install --no-audit --no-fund'
+      - name: Arabic fonts
+        continue-on-error: true
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq fonts-noto-core > /dev/null
+      - name: Chromium (for the image card)
+        continue-on-error: true
+        run: npx playwright install --with-deps chromium
       - name: Build and send the draft
         env:
           MODE: ${{ needs.gate.outputs.mode }}
           FORCE: ${{ inputs.force }}
+          DRY: ${{ github.event_name == 'workflow_dispatch' && inputs.dry || 'false' }}
         run: |
-          if [ "$FORCE" = "true" ]; then node src/telegram.js "$MODE" --force; else node src/telegram.js "$MODE"; fi
+          ARGS=""
+          if [ "$FORCE" = "true" ]; then ARGS="$ARGS --force"; fi
+          if [ "$DRY" != "false" ]; then ARGS="$ARGS --dry"; fi
+          node src/telegram.js "$MODE" $ARGS
+      - name: Keep the card image
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: telegram-card
+          path: whatsapp-report/out/telegram-*.png
+          if-no-files-found: ignore
       - name: Save state
         if: always()
         run: |
