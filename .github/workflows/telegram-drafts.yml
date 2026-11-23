@@ -1,0 +1,89 @@
+name: Telegram Drafts
+# Owner 23 Nov 2026 — 4-week Telegram trial. DRAFTS ONLY for human review; nothing is published anywhere.
+# Sun-Fri 18:00 Amman (15:00 UTC): "الخبر في 3 أسطر".  Saturday 18:00 Amman: "أسبوع الكريبتو بـ 5 أرقام".
+# GitHub schedule: crons never fire in this repo, so this hangs off "Hourly news" (dispatched every hour)
+# and runs only on the 15:00 UTC one. telegram-state.json stops a second send on the same day.
+
+on:
+  workflow_run:
+    workflows: ["Hourly news"]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "daily or weekly"
+        required: true
+        default: daily
+      force:
+        description: "send even if a draft already went today (true/false)"
+        required: false
+        default: "false"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: telegram-drafts
+  cancel-in-progress: false
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    outputs:
+      mode: ${{ steps.g.outputs.mode }}
+    steps:
+      - id: g
+        env:
+          EV: ${{ github.event_name }}
+          CREATED: ${{ github.event.workflow_run.created_at }}
+          IN_MODE: ${{ inputs.mode }}
+        run: |
+          if [ "$EV" = "workflow_dispatch" ]; then echo "mode=$IN_MODE" >> "$GITHUB_OUTPUT"; exit 0; fi
+          H=$(date -u -d "$CREATED" +%H); D=$(date -u -d "$CREATED" +%u)
+          M=none
+          if [ "$H" = "15" ]; then if [ "$D" = "6" ]; then M=weekly; else M=daily; fi; fi
+          echo "mode=$M" >> "$GITHUB_OUTPUT"
+          echo "created=$CREATED hour=$H day=$D mode=$M"
+  draft:
+    needs: gate
+    if: ${{ needs.gate.outputs.mode == 'daily' || needs.gate.outputs.mode == 'weekly' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      GREENAPI_API_TOKEN: ${{ secrets.GREENAPI_API_TOKEN }}
+      PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+    defaults:
+      run:
+        working-directory: whatsapp-report
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Cache node modules
+        uses: actions/cache@v4
+        with:
+          path: whatsapp-report/node_modules
+          key: wa-node-${{ hashFiles('whatsapp-report/package.json') }}
+      - name: Install
+        run: '[ -d node_modules ] || npm install --no-audit --no-fund'
+      - name: Build and send the draft
+        env:
+          MODE: ${{ needs.gate.outputs.mode }}
+          FORCE: ${{ inputs.force }}
+        run: |
+          if [ "$FORCE" = "true" ]; then node src/telegram.js "$MODE" --force; else node src/telegram.js "$MODE"; fi
+      - name: Save state
+        if: always()
+        run: |
+          git config user.name "telegram-drafts-bot"
+          git config user.email "bot@users.noreply.github.com"
+          git add telegram-state.json 2>/dev/null || true
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: telegram draft state [skip ci]"
+            git pull --rebase -X theirs --autostash origin main || true
+            git push
+          fi
