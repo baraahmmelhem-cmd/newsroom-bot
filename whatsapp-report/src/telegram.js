@@ -57,6 +57,7 @@ const pct = (n, d = 1) => (n > 0 ? "+" : "") + fmt(n, d) + "%";
 const ammanNow = () => new Date(Date.now() + 3 * 3600 * 1000);   // UTC fields = Amman wall clock (UTC+3)
 const dayAr = d => d.getUTCDate() + " " + MONTHS[d.getUTCMonth()];
 const isoDay = d => d.toISOString().slice(0, 10);
+const outlet = h => /^(Google News|Reuters Bloomberg|Arabic Economy)/.test(h.source) && h.title.includes(" - ") ? h.title.split(" - ").pop().trim() : h.source;
 
 function loadState() { try { return JSON.parse(fs.readFileSync(STATE, "utf8")); } catch { return {}; } }
 function saveState(s) { fs.writeFileSync(STATE, JSON.stringify(s, null, 2) + "\n"); }
@@ -202,6 +203,7 @@ async function askGemini(prompt) {
 
 const STYLE = [
   "LANGUAGE: simple Modern Standard Arabic (فصحى بسيطة), short sentences, Western digits 0-9 only, write money as 78,824$ and percent as 2.1%.",
+  "MONEY: always use the $ sign and never the word دولار: 78,824$ or 1.79 مليار$ or 669.2 مليون$. Spell names correctly: البيتكوين, الفيدرالي.",
   "Every line must start with an Arabic word (names of people and companies in Arabic letters).",
   "FACTS: use ONLY numbers and dates that appear in DATA or HEADLINES below. Never invent a number, a date, a name or a quote.",
   "If two sources give different numbers, write نحو before the number and explain the difference in notes.",
@@ -268,12 +270,13 @@ async function buildDaily() {
     "- what: one or two sentences: the event, the number, the date.",
     "- econ: the economic reason it matters and who is affected (one sentence).",
     "- politics: one sentence or null.",
+    "- impact: عالي or متوسط (how strongly this story moves the crypto market).",
     "- dollar: one short phrase with the DXY level from DATA and what we watch, or null if the dollar is not relevant to this story.",
     "- bonds: one short phrase with the 10-year yield from DATA and what we watch, or null if not relevant.",
     "- next_date: a specific date of the next related event, written like 26 نوفمبر, taken from CALENDAR or HEADLINES; next_event: what happens then.",
     "- refs: numbers of the headlines used. alternatives: two Arabic titles. alt_refs: their headline numbers.",
     "- notes: list of short Arabic notes about any number that differs between sources or needs confirmation (may be empty).",
-    "Reply with JSON only: {\"headline\":\"\",\"what\":\"\",\"econ\":\"\",\"politics\":null,\"dollar\":null,\"bonds\":null,\"next_date\":\"\",\"next_event\":\"\",\"refs\":[1],\"alternatives\":[\"\",\"\"],\"alt_refs\":[2,3],\"notes\":[]}",
+    "Reply with JSON only: {\"headline\":\"\",\"what\":\"\",\"econ\":\"\",\"politics\":null,\"impact\":\"عالي\",\"dollar\":null,\"bonds\":null,\"next_date\":\"\",\"next_event\":\"\",\"refs\":[1],\"alternatives\":[\"\",\"\"],\"alt_refs\":[2,3],\"notes\":[]}",
     "", "DATA:", ...data, "", "CALENDAR (upcoming high-impact US events, Amman dates):", ...(calLines.length ? calLines : ["none found"]), "", "HEADLINES:", ...list
   ].join("\n");
 
@@ -281,12 +284,12 @@ async function buildDaily() {
   for (const k of ["headline", "what", "econ", "next_date", "next_event"]) if (!j[k] || !String(j[k]).trim()) throw new Error("model left " + k + " empty");
   const clean = v => (v == null || /^(null|none|لا يوجد|-)$/i.test(String(v).trim())) ? null : String(v).trim();
 
-  const lines = ["الخبر في 3 أسطر", j.headline.trim(), "", "1) ماذا حدث؟", j.what.trim(), "", "2) لماذا يهم؟", "اقتصادياً: " + j.econ.trim()];
-  if (clean(j.politics)) lines.push("سياسياً: " + clean(j.politics));
-  lines.push("", "3) ماذا نراقب؟");
-  if (clean(j.dollar)) lines.push("• الدولار: " + clean(j.dollar));
-  if (clean(j.bonds)) lines.push("• السندات: " + clean(j.bonds));
-  lines.push("• " + j.next_date.trim() + ": " + j.next_event.trim(), "", DISCLAIMER);
+  const lines = ["📰 الخبر في 3 أسطر", "🔴 " + j.headline.trim(), "", "❓ 1) ماذا حدث؟", j.what.trim(), "", "🧠 2) لماذا يهم؟", "💰 اقتصادياً: " + j.econ.trim()];
+  if (clean(j.politics)) lines.push("🏛 سياسياً: " + clean(j.politics));
+  lines.push("", "👀 3) ماذا نراقب؟");
+  if (clean(j.dollar)) lines.push("💵 الدولار: " + clean(j.dollar));
+  if (clean(j.bonds)) lines.push("📉 السندات: " + clean(j.bonds));
+  lines.push("🗓 " + j.next_date.trim() + ": " + j.next_event.trim(), "", "ℹ️ " + DISCLAIMER);
   const draft = lines.join("\n");
 
   const pickRefs = r => (Array.isArray(r) ? r : []).map(n => heads[Number(n) - 1]).filter(Boolean);
@@ -300,7 +303,7 @@ async function buildDaily() {
     "مسودة للمراجعة فقط، لا تُنشر قبل الموافقة.",
     "",
     "المصادر:",
-    ...(srcs.length ? srcs.map(h => "• " + h.source + ": " + h.link) : ["• لم يحدد النموذج مصدراً — يحتاج تأكيداً"]),
+    ...(srcs.length ? srcs.map(h => "• " + outlet(h) + ": " + h.link) : ["• لم يحدد النموذج مصدراً — يحتاج تأكيداً"]),
     "• أرقام السوق: " + ["CoinGecko/Coinbase/Kraken", d && "Yahoo Finance (DXY)", t && "وزارة الخزانة الأميركية (10 سنوات)", etf && "Farside", fg[0] && "alternative.me"].filter(Boolean).join("، "),
     "",
     "خبران بديلان:",
@@ -310,7 +313,14 @@ async function buildDaily() {
     ...([...unv.map(n => "الرقم " + n + " غير موجود في المصادر المجمعة"), ...check, ...(j.notes || [])].map(s => "• " + s)),
   ];
   if (notes[notes.length - 1] === "يحتاج تأكيداً:") notes.push("• لا شيء ظاهر — راجعي التاريخ والأرقام قبل النشر");
-  return { draft, notes: notes.join("\n") };
+  const watch = [];
+  if (clean(j.dollar)) watch.push({ label: "الدولار", text: clean(j.dollar) });
+  if (clean(j.bonds)) watch.push({ label: "السندات", text: clean(j.bonds) });
+  watch.push({ label: j.next_date.trim(), text: j.next_event.trim() });
+  const imp = String(j.impact || "").trim();
+  const card = { headline: j.headline.trim(), what: j.what.trim(), econ: j.econ.trim(), politics: clean(j.politics), impact: /^(عالي|متوسط)$/.test(imp) ? imp : null,
+    watch, date: dayAr(today) + " " + today.getUTCFullYear(), sources: [...new Set(srcs.map(outlet))].slice(0, 3).join(" · ") };
+  return { draft, notes: notes.join("\n"), card };
 }
 
 // ---------- WEEKLY: أسبوع الكريبتو بـ 5 أرقام ----------
@@ -411,16 +421,16 @@ async function buildWeekly() {
   const pol = j.politics && !/^(null|none)$/i.test(String(j.politics).trim()) ? String(j.politics).trim() : null;
 
   const lines = [
-    "أسبوع الكريبتو بـ 5 أرقام", "من " + w.monAr + " إلى " + w.friAr, "",
-    "1) رقم الأسبوع: " + j.n1_label.trim(),
-    "2) تدفقات صناديق ETF للبيتكوين: " + n2,
-    "3) مؤشر الدولار DXY: " + n3,
-    "4) عائد السندات الأميركية 10 سنوات: " + n4,
-    "5) مؤشر الخوف والطمع: " + n5,
-    "", "قراءة Mr_Amwal", j.read1.trim(), j.read2.trim()
+    "📊 أسبوع الكريبتو بـ 5 أرقام", "🗓 من " + w.monAr + " إلى " + w.friAr, "",
+    "1️⃣ رقم الأسبوع: " + j.n1_label.trim(),
+    "2️⃣ تدفقات صناديق ETF للبيتكوين: " + n2,
+    "3️⃣ مؤشر الدولار DXY: " + n3,
+    "4️⃣ عائد السندات الأميركية 10 سنوات: " + n4,
+    "5️⃣ مؤشر الخوف والطمع: " + n5,
+    "", "🧠 قراءة Mr_Amwal", j.read1.trim(), j.read2.trim()
   ];
-  if (pol) lines.push("سياسياً: " + pol);
-  lines.push("نراقب: " + j.watch.trim().replace(/^نراقب:?\s*/, ""), "", DISCLAIMER);
+  if (pol) lines.push("🏛 سياسياً: " + pol);
+  lines.push("👀 نراقب: " + j.watch.trim().replace(/^نراقب:?\s*/, ""), "", "ℹ️ " + DISCLAIMER);
 
   const srcs = (j.refs || []).map(n => heads[Number(n) - 1]).filter(Boolean);
   const blob = data.join("\n") + "\n" + calLines.join("\n") + "\n" + heads.map(h => h.title).join("\n");
@@ -452,12 +462,25 @@ async function buildWeekly() {
   const today = isoDay(ammanNow());
   if (!dry && !process.argv.includes("--force") && state[mode] === today) { console.log("[telegram] " + mode + " draft already sent today"); process.exit(0); }
   try {
-    const { draft, notes } = mode === "daily" ? await buildDaily() : await buildWeekly();
+    const { draft, notes, card } = mode === "daily" ? await buildDaily() : await buildWeekly();
     console.log("\n===== DRAFT =====\n" + draft + "\n\n===== NOTES =====\n" + notes + "\n");
     if (process.env.GITHUB_STEP_SUMMARY) fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, "```\n" + draft + "\n\n" + notes + "\n```\n");
+    let imagePath = null;
+    if (card) {
+      try {
+        fs.mkdirSync(path.join(ROOT, "out"), { recursive: true });
+        imagePath = await require("./telegram-card").renderCard(card, path.join(ROOT, "out", "telegram-" + mode + ".png"));
+        console.log("[telegram] card rendered");
+      } catch (e) { imagePath = null; console.log("[telegram] card failed, text only:", e.message); }
+    }
     if (dry) return;
     const wa = require("./send");
-    await wa.sendToSelf({ text: draft });
+    let sentImage = false;
+    if (imagePath) {
+      try { await wa.sendToSelf({ imagePath, caption: draft.length <= 950 ? draft : "" }); sentImage = true; }
+      catch (e) { console.log("[telegram] image send failed, text only:", e.message); }
+    }
+    if (!sentImage || draft.length > 950) await wa.sendToSelf({ text: draft });
     await new Promise(r => setTimeout(r, 3000));
     await wa.sendToSelf({ text: notes });
     state[mode] = today;
