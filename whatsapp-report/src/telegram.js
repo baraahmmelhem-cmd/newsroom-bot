@@ -175,28 +175,42 @@ async function headlines(hours) {
 async function askGemini(prompt) {
   const key = process.env.GEMINI_API_KEY;
   if (!key) throw new Error("GEMINI_API_KEY secret is missing");
-  let models = ["gemini-flash-latest", "gemini-2.5-flash", "gemini-flash-lite-latest"];
+  let models = ["gemini-flash-lite-latest", "gemini-flash-latest"];
   try {
     const lm = await get("https://generativelanguage.googleapis.com/v1beta/models?pageSize=200&key=" + key, true);
     const names = (lm.models || []).filter(m => (m.supportedGenerationMethods || []).includes("generateContent"))
-      .map(m => m.name.split("/").pop()).filter(n => /flash/.test(n) && !/image|tts|live|audio|embedding|exp/.test(n));
-    models = [...new Set([...models, ...names])].slice(0, 6);
+      .map(m => m.name.split("/").pop()).filter(n => !/image|tts|live|audio|embedding|vision|omni|veo|imagen/.test(n));
+    models = [...new Set([...models,
+      ...names.filter(n => /flash/.test(n)), ...names.filter(n => /gemma/.test(n)), ...names.filter(n => /pro/.test(n))])].slice(0, 8);
   } catch (e) { console.log("[telegram] model list failed", e.message); }
+  // 24 Nov 2026: Google's free tier answers 503 "high demand" for long stretches, so retry several
+  // rounds (45 s apart); a model that says 404 (retired) or 429 (quota used up) is not asked again.
+  const dead = new Set();
   let last;
-  for (const model of [...models, ...models.slice(0, 2)]) {
-    try {
-      const r = await fetch("https://generativelanguage.googleapis.com/v1beta/models/" + model + ":generateContent?key=" + key, {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.2, responseMimeType: "application/json" } }),
-        signal: AbortSignal.timeout(90000)
-      });
-      if (!r.ok) throw new Error("HTTP " + r.status);
-      const j = await r.json();
-      const text = (j.candidates?.[0]?.content?.parts || []).map(p => p.text || "").join("");
-      const parsed = JSON.parse(text.slice(text.indexOf("{"), text.lastIndexOf("}") + 1));
-      console.log("[telegram] model used:", model);
-      return parsed;
-    } catch (e) { last = model + ": " + e.message; console.log("[telegram] model failed", last); await new Promise(r => setTimeout(r, 6000)); }
+  for (let round = 0; round < 4; round++) {
+    if (round) await new Promise(r => setTimeout(r, 45000));
+    for (const model of models) {
+      if (dead.has(model)) continue;
+      try {
+        const r = await fetch("https://generativelanguage.googleapis.com/v1beta/models/" + model + ":generateContent?key=" + key, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.2, responseMimeType: "application/json" } }),
+          signal: AbortSignal.timeout(90000)
+        });
+        if (!r.ok) {
+          if ([400, 403, 404, 429].includes(r.status)) dead.add(model);
+          last = model + ": HTTP " + r.status;
+          console.log("[telegram] model failed", last);
+          await new Promise(r => setTimeout(r, 3000));
+          continue;
+        }
+        const j = await r.json();
+        const text = (j.candidates?.[0]?.content?.parts || []).map(p => p.text || "").join("");
+        const parsed = JSON.parse(text.slice(text.indexOf("{"), text.lastIndexOf("}") + 1));
+        console.log("[telegram] model used:", model);
+        return parsed;
+      } catch (e) { last = model + ": " + e.message; console.log("[telegram] model failed", last); await new Promise(r => setTimeout(r, 3000)); }
+    }
   }
   throw new Error("No Gemini model worked (" + last + ")");
 }
