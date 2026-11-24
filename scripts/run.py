@@ -377,9 +377,18 @@ def write_item(headlines, posted, btc, force=False):
             print("List models failed:", e)
         candidates += ["gemini-flash-lite-latest", "gemini-flash-latest", "gemini-pro-latest"]
         text, last = None, None
-        for attempt, model in enumerate(list(dict.fromkeys(candidates))[:14]):
+        # 24 Nov 2026: Google's free tier answers 503 "high demand" for long stretches, so one pass
+        # over the models is not enough. Up to 4 passes, 45 s apart; a model that says 404 (retired)
+        # or 429 (quota used up) is not asked again.
+        dead = set()
+        plan = []
+        for rnd in range(4):
+            plan += [(rnd, m) for m in list(dict.fromkeys(candidates))[:14]]
+        for attempt, (rnd, model) in enumerate(plan):
+            if model in dead:
+                continue
             if attempt:
-                time.sleep(3)  # brief pause helps with "high demand" (503) errors
+                time.sleep(45 if (rnd and plan[attempt - 1][0] != rnd) else 3)  # pause helps with "high demand" (503)
             try:
                 r = requests.post(f"{base}/models/{model}:generateContent", params={"key": key},
                                   json={"contents": [{"parts": [{"text": prompt}]}],
@@ -402,6 +411,8 @@ def write_item(headlines, posted, btc, force=False):
                     print("Model bad reply:", last, flush=True)
                     continue
             last = (model, r.status_code, r.text[:200])
+            if r.status_code in (400, 403, 404, 429):
+                dead.add(model)
             print("Model failed:", last, flush=True)
         if text is None:
             sys.exit(f"No Gemini model worked: {last}")
