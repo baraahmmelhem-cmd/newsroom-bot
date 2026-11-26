@@ -42,8 +42,18 @@ async function buildCard() {
       const { png } = await buildCard();
       console.log('card written to', png);
     } else {
+      // Owner 26 Nov: the evening (and morning) card must go out once a day. Several "Hourly news"
+      // runs can land in the same hour, so a date guard stops a second send of the same report.
+      const STATE = path.join(__dirname, '..', 'report-state.json');
+      const kind = process.env.REPORT_KIND === 'evening' ? 'evening' : 'morning';
+      const today = new Date(Date.now() + 3 * 3600 * 1000).toISOString().slice(0, 10);
+      let st = {};
+      try { st = JSON.parse(fs.readFileSync(STATE, 'utf8')); } catch (e) {}
+      if (st[kind] === today) { console.log(`[dedup] ${kind} report already sent today (${today}); skipping.`); process.exit(0); }
       const { png, caption, data } = await buildCard();
       await wa.sendToSelf({ imagePath: png, caption });
+      st[kind] = today;
+      try { fs.writeFileSync(STATE, JSON.stringify(st, null, 2) + '\n'); } catch (e) { console.warn('[dedup] could not write state:', e.message); }
       // Detailed text report right after the card (prices, crypto, US, UAE/Gulf, stocks).
       try {
         const text = await require('./detail').detailText(data, arabicDate());
