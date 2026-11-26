@@ -284,13 +284,14 @@ async function buildDaily() {
     "- what: one or two sentences: the event, the number, the date.",
     "- econ: the economic reason it matters and who is affected (one sentence).",
     "- politics: one sentence or null.",
-    "- impact: عالي or متوسط (how strongly this story moves the crypto market).",
+    "- impact: how strongly this story moves the market: عالي, متوسط or منخفض.",
+    "- impact_dir: the direction for the market: إيجابي, سلبي or محايد. impact_reason: one short Arabic clause (max 10 words) saying why.",
     "- dollar: one short phrase with the DXY level from DATA and what we watch, or null if the dollar is not relevant to this story.",
     "- bonds: one short phrase with the 10-year yield from DATA and what we watch, or null if not relevant.",
     "- next_date: a specific date of the next related event, written like 26 نوفمبر, taken from CALENDAR or HEADLINES; next_event: what happens then.",
     "- refs: numbers of the headlines used. alternatives: two Arabic titles. alt_refs: their headline numbers.",
     "- notes: list of short Arabic notes about any number that differs between sources or needs confirmation (may be empty).",
-    "Reply with JSON only: {\"headline\":\"\",\"what\":\"\",\"econ\":\"\",\"politics\":null,\"impact\":\"عالي\",\"dollar\":null,\"bonds\":null,\"next_date\":\"\",\"next_event\":\"\",\"refs\":[1],\"alternatives\":[\"\",\"\"],\"alt_refs\":[2,3],\"notes\":[]}",
+    "Reply with JSON only: {\"headline\":\"\",\"what\":\"\",\"econ\":\"\",\"politics\":null,\"impact\":\"عالي\",\"impact_dir\":\"سلبي\",\"impact_reason\":\"\",\"dollar\":null,\"bonds\":null,\"next_date\":\"\",\"next_event\":\"\",\"refs\":[1],\"alternatives\":[\"\",\"\"],\"alt_refs\":[2,3],\"notes\":[]}",
     "", "DATA:", ...data, "", "CALENDAR (upcoming high-impact US events, Amman dates):", ...(calLines.length ? calLines : ["none found"]), "", "HEADLINES:", ...list
   ].join("\n");
 
@@ -303,7 +304,14 @@ async function buildDaily() {
   lines.push("", "3) ماذا نراقب؟");
   if (clean(j.dollar)) lines.push("💵 الدولار: " + clean(j.dollar));
   if (clean(j.bonds)) lines.push("📈 السندات: " + clean(j.bonds));
-  lines.push("🗓 " + j.next_date.trim() + ": " + j.next_event.trim(), "", DISCLAIMER);
+  lines.push("🗓 " + j.next_date.trim() + ": " + j.next_event.trim());
+  const idir = String(j.impact_dir || "").trim(), istr = String(j.impact || "").trim();
+  const IDOT = { "عالي": "🔴", "متوسط": "🟡", "منخفض": "⚪" };
+  if (/^(إيجابي|سلبي|محايد)$/.test(idir) && IDOT[istr]) {
+    const ir = String(j.impact_reason || "").trim();
+    lines.push("", "📊 التأثير على السوق: " + idir + " " + IDOT[istr] + " " + istr + (ir ? " — " + ir : ""));
+  }
+  lines.push("", DISCLAIMER);
   const draft = lines.join("\n");
 
   const pickRefs = r => (Array.isArray(r) ? r : []).map(n => heads[Number(n) - 1]).filter(Boolean);
@@ -332,7 +340,7 @@ async function buildDaily() {
   if (clean(j.bonds)) watch.push({ label: "السندات", text: clean(j.bonds) });
   watch.push({ label: j.next_date.trim(), text: j.next_event.trim() });
   const imp = String(j.impact || "").trim();
-  const card = { headline: j.headline.trim(), what: j.what.trim(), econ: j.econ.trim(), politics: clean(j.politics), impact: /^(عالي|متوسط)$/.test(imp) ? imp : null,
+  const card = { headline: j.headline.trim(), what: j.what.trim(), econ: j.econ.trim(), politics: clean(j.politics), impact: /^(عالي|متوسط|منخفض)$/.test(imp) ? imp : null,
     watch, date: dayAr(today) + " " + today.getUTCFullYear(), sources: [...new Set(srcs.map(outlet))].slice(0, 3).join(" · ") };
   return { draft, notes: notes.join("\n"), card };
 }
@@ -495,8 +503,7 @@ async function buildWeekly() {
       catch (e) { console.log("[telegram] image send failed, text only:", e.message); }
     }
     if (!sentImage || draft.length > 950) await wa.sendToSelf({ text: draft });
-    await new Promise(r => setTimeout(r, 3000));
-    await wa.sendToSelf({ text: notes });
+    // Owner 26 Nov: the review-notes paragraph is no longer sent to the channel; it stays in the Actions log/summary only.
     state[mode] = today;
     saveState(state);
     console.log("[telegram] sent");
