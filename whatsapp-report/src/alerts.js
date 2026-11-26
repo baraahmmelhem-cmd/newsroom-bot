@@ -204,7 +204,7 @@ function buildPrompt(headlines, sent, market = {}) {
     '- body: ONE short sentence (max 25 words) with the key detail. No source line, no advice, no hashtags.',
     '- impact_dir: the effect on the market: إيجابي, سلبي or محايد.',
     '- impact_strength: عالي (moves the whole market now: Fed/rates, surprise CPI/jobs, record ETF flows, bitcoin >=5% in 24h, big US regulation, a market-moving Trump statement), متوسط (one asset/sector or sentiment, bitcoin 2-5%) or منخفض (background, a move under 2%).',
-    '- impact_reason: one short Arabic clause (max 10 words) saying why, with no emoji.',
+    '- impact_reason: one or two professional Modern Standard Arabic sentences (max 40 words) explaining HOW this news moves the market (investor confidence, liquidity, interest rates, institutional demand), mentioning the market reaction if a number is in the headlines. No emoji, no advice, no predictions.',
     'Reply with JSON only: {"items":[{"title":"...","body":"...","impact_dir":"سلبي","impact_strength":"عالي","impact_reason":"...","refs":[1,7],"event":"short-english-key"}]}  (use {"items":[]} when nothing qualifies)'
   ].join('\n');
 }
@@ -310,7 +310,7 @@ if (/\b(ADA|KAVA|DOGE|SHIB|PEPE|LTC|AVAX|TRX|TON|LINK|SUI|HYPE|ZEC|XMR|BCH|DOT|M
     // Owner's manager (26 Nov): same short market-impact line as the newsroom items.
     { const d = String(x.impact_dir || '').trim(), st = String(x.impact_strength || '').trim(), r = String(x.impact_reason || '').trim();
       const DOT = { 'عالي': '🔴', 'متوسط': '🟡', 'منخفض': '⚪' };
-      if (/^(إيجابي|سلبي|محايد)$/.test(d) && DOT[st]) body += '\n📊 التأثير على السوق: ' + d + ' ' + DOT[st] + ' ' + st + (r ? ' — ' + r : ''); }
+      if (/^(إيجابي|سلبي|محايد)$/.test(d) && DOT[st]) body += '\n\n📊 *التأثير: ' + d + ' ' + DOT[st] + ' ' + st + '*' + (r ? '\n' + r : ''); }
     picked.push({ event: ev, title: String(x.title).replace(/🚨\s*/g, '').replace(/عاجل\s*[:：]?\s*/g, '').replace(/\s+/g, ' ').trim(), body });
     if (picked.length >= MAX_ITEMS) break;
   }
