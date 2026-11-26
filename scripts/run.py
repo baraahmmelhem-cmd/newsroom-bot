@@ -325,7 +325,7 @@ one item every 2 hours, so each one must be the most important market story of t
 - category: "كريبتو" for crypto stories, "اقتصاد" for economy/markets/company stories, "عاجل" only for a truly breaking shock.
 - impact_dir: this story's effect on the market: "إيجابي" (supports demand/price), "سلبي" (pressures price down) or "محايد".
 - impact_strength: "عالي" (moves the whole market now: Fed/rates, surprise CPI/jobs, record ETF flows, bitcoin >=5% in 24h, big US regulation, a market-moving Trump statement), "متوسط" (affects one asset/sector or sentiment: institutional buying, a payments story, secondary data, bitcoin 2-5%) or "منخفض" (background/opinion, a move under 2%).
-- impact_reason: one short Arabic clause (max 10 words) saying why, with no emoji.
+- impact_reason: one or two professional Arabic sentences (max 40 words) explaining HOW this story moves the market (investor confidence, liquidity, interest rates, institutional demand), with no emoji, no advice, no predictions.
 - REPEATS: a story about the same company/figure/event as ANY item in the published list is a
   repeat even if worded differently. Never publish the same event twice.
 
@@ -441,7 +441,7 @@ def add_impact_line(item):
     reason = (item.get("impact_reason") or "").strip()
     if d not in ("إيجابي", "سلبي", "محايد") or st not in IMPACT_DOT:
         return item
-    line = "📊 التأثير على السوق: " + d + " " + IMPACT_DOT[st] + " " + st + (" — " + reason if reason else "")
+    line = "📊 التأثير: " + d + " " + IMPACT_DOT[st] + " " + st + ("\n" + reason if reason else "")
     body = item.get("body", "")
     i = body.find("المصدر:")
     if i == -1:
