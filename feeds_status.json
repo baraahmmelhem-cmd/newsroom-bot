@@ -1,37 +1,30 @@
 {
-  "checked": 1795575755,
+  "checked": 1795662066,
   "dead": [
     "Al Jazeera",
     "Al Jazeera Arabic",
     "Al Jazeera Economy",
-    "Asharq Business",
+    "Bitcoinist",
     "Cointelegraph Arabic",
-    "Google News AI",
-    "Google News Big Tech",
-    "Google News China",
-    "Google News Crypto",
-    "Google News Fed",
-    "Google News Payments",
-    "Google News Trump",
-    "Reuters Bloomberg"
+    "Google News Crypto"
   ],
   "feeds": {
     "Cointelegraph": {
       "ok": true,
       "items": 30,
-      "age_h": 1.3,
+      "age_h": 1.5,
       "why": ""
     },
     "CoinDesk": {
       "ok": true,
       "items": 25,
-      "age_h": 9.2,
+      "age_h": 8.6,
       "why": ""
     },
     "The Block": {
       "ok": true,
       "items": 20,
-      "age_h": 0.2,
+      "age_h": 0.6,
       "why": ""
     },
     "Decrypt": {
@@ -43,67 +36,67 @@
     "Bitcoin Magazine": {
       "ok": true,
       "items": 10,
-      "age_h": 4.5,
+      "age_h": 3.5,
       "why": ""
     },
     "CryptoSlate": {
       "ok": true,
       "items": 10,
-      "age_h": 0.2,
+      "age_h": 1.2,
       "why": ""
     },
     "Bitcoinist": {
-      "ok": true,
+      "ok": false,
       "items": 8,
-      "age_h": 10.7,
-      "why": ""
+      "age_h": 34.7,
+      "why": "newest item 35h old"
     },
     "NewsBTC": {
       "ok": true,
       "items": 10,
-      "age_h": 6.9,
+      "age_h": 14.5,
       "why": ""
     },
     "CryptoNews": {
       "ok": true,
       "items": 20,
-      "age_h": 6.2,
+      "age_h": 5.4,
       "why": ""
     },
     "The Defiant": {
       "ok": true,
       "items": 100,
-      "age_h": 0.4,
+      "age_h": 1.9,
       "why": ""
     },
     "CNBC Economy": {
       "ok": true,
       "items": 30,
-      "age_h": 8.4,
+      "age_h": 5.1,
       "why": ""
     },
     "CNBC Markets": {
       "ok": true,
       "items": 30,
-      "age_h": 1.8,
+      "age_h": 1.4,
       "why": ""
     },
     "MarketWatch": {
       "ok": true,
       "items": 10,
-      "age_h": 1.0,
+      "age_h": 1.8,
       "why": ""
     },
     "CNBC Top News": {
       "ok": true,
       "items": 30,
-      "age_h": 0.2,
+      "age_h": 0.4,
       "why": ""
     },
     "CNBC Tech": {
       "ok": true,
       "items": 30,
-      "age_h": 0.9,
+      "age_h": 0.4,
       "why": ""
     },
     "Google News Crypto": {
@@ -113,52 +106,52 @@
       "why": "HTTPError"
     },
     "Google News Fed": {
-      "ok": false,
-      "items": 0,
-      "age_h": null,
-      "why": "HTTPError"
+      "ok": true,
+      "items": 29,
+      "age_h": 0.1,
+      "why": ""
     },
     "Google News Trump": {
-      "ok": false,
-      "items": 0,
-      "age_h": null,
-      "why": "HTTPError"
+      "ok": true,
+      "items": 44,
+      "age_h": 0.2,
+      "why": ""
     },
     "Google News China": {
-      "ok": false,
-      "items": 0,
-      "age_h": null,
-      "why": "HTTPError"
+      "ok": true,
+      "items": 32,
+      "age_h": 0.1,
+      "why": ""
     },
     "Google News Big Tech": {
-      "ok": false,
-      "items": 0,
-      "age_h": null,
-      "why": "HTTPError"
+      "ok": true,
+      "items": 61,
+      "age_h": 0.0,
+      "why": ""
     },
     "Google News Payments": {
-      "ok": false,
-      "items": 0,
-      "age_h": null,
-      "why": "HTTPError"
+      "ok": true,
+      "items": 21,
+      "age_h": 0.3,
+      "why": ""
     },
     "Al Jazeera Arabic": {
       "ok": false,
       "items": 0,
       "age_h": null,
-      "why": "HTTPError"
+      "why": "no dated items"
     },
     "Al Jazeera Economy": {
       "ok": false,
       "items": 0,
       "age_h": null,
-      "why": "HTTPError"
+      "why": "no dated items"
     },
     "Google News AI": {
-      "ok": false,
-      "items": 0,
-      "age_h": null,
-      "why": "HTTPError"
+      "ok": true,
+      "items": 49,
+      "age_h": 0.0,
+      "why": ""
     },
     "Cointelegraph Arabic": {
       "ok": false,
@@ -169,26 +162,26 @@
     "Wu Blockchain": {
       "ok": true,
       "items": 20,
-      "age_h": 15.7,
+      "age_h": 13.8,
       "why": ""
     },
     "Asharq Business": {
-      "ok": false,
-      "items": 0,
-      "age_h": null,
-      "why": "HTTPError"
+      "ok": true,
+      "items": 6,
+      "age_h": 0.1,
+      "why": ""
     },
     "Reuters Bloomberg": {
-      "ok": false,
-      "items": 0,
-      "age_h": null,
-      "why": "HTTPError"
+      "ok": true,
+      "items": 76,
+      "age_h": 0.0,
+      "why": ""
     },
     "Al Jazeera": {
       "ok": false,
-      "items": 0,
-      "age_h": null,
-      "why": "HTTPError"
+      "items": 1,
+      "age_h": 54114.7,
+      "why": "newest item 54115h old"
     }
   }
 }
