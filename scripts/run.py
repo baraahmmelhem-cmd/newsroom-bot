@@ -323,11 +323,14 @@ one item every 2 hours, so each one must be the most important market story of t
   (بيتكوين، إيثريوم، ريبل، سولانا، بلاك روك، الفيدرالي). Put numbers in the middle of the sentence.
 - Correct Arabic grammar, no slang, no buy/sell advice, no hashtags, no emoji.
 - category: "كريبتو" for crypto stories, "اقتصاد" for economy/markets/company stories, "عاجل" only for a truly breaking shock.
+- impact_dir: this story's effect on the market: "إيجابي" (supports demand/price), "سلبي" (pressures price down) or "محايد".
+- impact_strength: "عالي" (moves the whole market now: Fed/rates, surprise CPI/jobs, record ETF flows, bitcoin >=5% in 24h, big US regulation, a market-moving Trump statement), "متوسط" (affects one asset/sector or sentiment: institutional buying, a payments story, secondary data, bitcoin 2-5%) or "منخفض" (background/opinion, a move under 2%).
+- impact_reason: one short Arabic clause (max 10 words) saying why, with no emoji.
 - REPEATS: a story about the same company/figure/event as ANY item in the published list is a
   repeat even if worded differently. Never publish the same event twice.
 
 Reply with JSON only, no markdown fences:
-{{"skip": false, "title": "...", "body": "...", "category": "كريبتو|اقتصاد|عاجل|تنبيه", "hot": false, "refs": [1, 5]}}
+{{"skip": false, "title": "...", "body": "...", "category": "كريبتو|اقتصاد|عاجل|تنبيه", "hot": false, "impact_dir": "إيجابي|سلبي|محايد", "impact_strength": "عالي|متوسط|منخفض", "impact_reason": "...", "refs": [1, 5]}}
 Set "hot": true ONLY for truly urgent, market-moving news (major exchange hack, Fed decision,
 big US data release); otherwise false.
 If every strong story is already published, reply {{"skip": true}}."""
@@ -426,6 +429,26 @@ SITE = "https://www.mr-amwal.com"
 # captured yet, so we try the Arabic label first, then likely slugs.
 TAG_SLUGS = {"كريبتو": ["crypto"], "اقتصاد": ["economy", "economics"],
              "عاجل": ["urgent", "breaking"], "تنبيه": ["alert"]}
+
+
+IMPACT_DOT = {"عالي": "🔴", "متوسط": "🟡", "منخفض": "⚪"}
+
+
+def add_impact_line(item):
+    """Owner's manager (26 Nov): every news item carries one line with its market impact."""
+    d = (item.get("impact_dir") or "").strip()
+    st = (item.get("impact_strength") or "").strip()
+    reason = (item.get("impact_reason") or "").strip()
+    if d not in ("إيجابي", "سلبي", "محايد") or st not in IMPACT_DOT:
+        return item
+    line = "📊 التأثير على السوق: " + d + " " + IMPACT_DOT[st] + " " + st + (" — " + reason if reason else "")
+    body = item.get("body", "")
+    i = body.find("المصدر:")
+    if i == -1:
+        item["body"] = body.rstrip() + "\n\n" + line
+    else:
+        item["body"] = body[:i].rstrip() + "\n\n" + line + "\n\n" + body[i:].strip()
+    return item
 
 
 def publish(item):
@@ -624,6 +647,7 @@ def main():
     if bad:
         print("Skipped (Bitcoin price not verified):", item.get("title"), "-", bad)
         return
+    add_impact_line(item)
     publish(item)
     whatsapp(item)
     posted.append(item["title"])
