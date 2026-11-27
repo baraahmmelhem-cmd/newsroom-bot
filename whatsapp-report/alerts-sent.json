@@ -1,10 +1,5 @@
 [
   {
-    "title": "🇺🇸 التحقيق مع جاسوس صيني مرتبط بالرئيس التنفيذي السابق لإنفيديا",
-    "event": "nvidia-china-spy-investigation",
-    "ts": 1795399472321
-  },
-  {
     "title": "📉 الذهب يهبط لأدنى مستوى في 14 شهراً وسط مخاوف الفائدة",
     "event": "gold-low-rate-fears",
     "ts": 1795402918993
@@ -651,5 +646,10 @@
     "title": "📈 بيتكوين والأسهم ترتد بعد موجة الهدوء",
     "event": "bitcoin-tech-futures-rebound-thanksgiving",
     "ts": 1795773725836
+  },
+  {
+    "title": "🇺🇸 ترامب يشيد بجهود رئيس وزراء العراق لمكافحة تهريب النفط",
+    "event": "trump-iraq-oil-smuggling-support",
+    "ts": 1795777328447
   }
 ]
