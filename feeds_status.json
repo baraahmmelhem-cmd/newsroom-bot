@@ -1,84 +1,84 @@
 {
-  "checked": 1795662066,
+  "checked": 1795748449,
   "dead": [
     "Al Jazeera",
     "Al Jazeera Arabic",
     "Al Jazeera Economy",
-    "Bitcoinist",
+    "Asharq Business",
     "Cointelegraph Arabic",
-    "Google News Crypto"
+    "Wu Blockchain"
   ],
   "feeds": {
     "Cointelegraph": {
       "ok": true,
       "items": 30,
-      "age_h": 1.5,
+      "age_h": 1.2,
       "why": ""
     },
     "CoinDesk": {
       "ok": true,
       "items": 25,
-      "age_h": 8.6,
+      "age_h": 9.5,
       "why": ""
     },
     "The Block": {
       "ok": true,
       "items": 20,
-      "age_h": 0.6,
+      "age_h": 9.5,
       "why": ""
     },
     "Decrypt": {
       "ok": true,
-      "items": 38,
-      "age_h": 4.4,
+      "items": 35,
+      "age_h": 5.0,
       "why": ""
     },
     "Bitcoin Magazine": {
       "ok": true,
       "items": 10,
-      "age_h": 3.5,
+      "age_h": 10.5,
       "why": ""
     },
     "CryptoSlate": {
       "ok": true,
       "items": 10,
-      "age_h": 1.2,
+      "age_h": 0.8,
       "why": ""
     },
     "Bitcoinist": {
-      "ok": false,
+      "ok": true,
       "items": 8,
-      "age_h": 34.7,
-      "why": "newest item 35h old"
+      "age_h": 8.7,
+      "why": ""
     },
     "NewsBTC": {
       "ok": true,
       "items": 10,
-      "age_h": 14.5,
+      "age_h": 6.8,
       "why": ""
     },
     "CryptoNews": {
       "ok": true,
       "items": 20,
-      "age_h": 5.4,
+      "age_h": 6.9,
       "why": ""
     },
     "The Defiant": {
       "ok": true,
       "items": 100,
-      "age_h": 1.9,
+      "age_h": 0.8,
       "why": ""
     },
     "CNBC Economy": {
       "ok": true,
       "items": 30,
-      "age_h": 5.1,
+      "age_h": 0.9,
       "why": ""
     },
     "CNBC Markets": {
       "ok": true,
       "items": 30,
-      "age_h": 1.4,
+      "age_h": 9.1,
       "why": ""
     },
     "MarketWatch": {
@@ -90,49 +90,49 @@
     "CNBC Top News": {
       "ok": true,
       "items": 30,
-      "age_h": 0.4,
+      "age_h": 0.9,
       "why": ""
     },
     "CNBC Tech": {
       "ok": true,
       "items": 30,
-      "age_h": 0.4,
+      "age_h": 9.9,
       "why": ""
     },
     "Google News Crypto": {
-      "ok": false,
-      "items": 0,
-      "age_h": null,
-      "why": "HTTPError"
+      "ok": true,
+      "items": 100,
+      "age_h": 0.0,
+      "why": ""
     },
     "Google News Fed": {
       "ok": true,
-      "items": 29,
-      "age_h": 0.1,
+      "items": 23,
+      "age_h": 0.2,
       "why": ""
     },
     "Google News Trump": {
       "ok": true,
-      "items": 44,
-      "age_h": 0.2,
+      "items": 24,
+      "age_h": 0.1,
       "why": ""
     },
     "Google News China": {
       "ok": true,
-      "items": 32,
+      "items": 28,
       "age_h": 0.1,
       "why": ""
     },
     "Google News Big Tech": {
       "ok": true,
-      "items": 61,
-      "age_h": 0.0,
+      "items": 35,
+      "age_h": 0.1,
       "why": ""
     },
     "Google News Payments": {
       "ok": true,
-      "items": 21,
-      "age_h": 0.3,
+      "items": 28,
+      "age_h": 0.0,
       "why": ""
     },
     "Al Jazeera Arabic": {
@@ -149,8 +149,8 @@
     },
     "Google News AI": {
       "ok": true,
-      "items": 49,
-      "age_h": 0.0,
+      "items": 42,
+      "age_h": 0.2,
       "why": ""
     },
     "Cointelegraph Arabic": {
@@ -160,28 +160,28 @@
       "why": "HTTPError"
     },
     "Wu Blockchain": {
-      "ok": true,
-      "items": 20,
-      "age_h": 13.8,
-      "why": ""
+      "ok": false,
+      "items": 0,
+      "age_h": null,
+      "why": "HTTPError"
     },
     "Asharq Business": {
-      "ok": true,
-      "items": 6,
-      "age_h": 0.1,
-      "why": ""
+      "ok": false,
+      "items": 1,
+      "age_h": 21043.6,
+      "why": "newest item 21044h old"
     },
     "Reuters Bloomberg": {
       "ok": true,
-      "items": 76,
-      "age_h": 0.0,
+      "items": 50,
+      "age_h": 0.1,
       "why": ""
     },
     "Al Jazeera": {
       "ok": false,
-      "items": 1,
-      "age_h": 54114.7,
-      "why": "newest item 54115h old"
+      "items": 0,
+      "age_h": null,
+      "why": "no dated items"
     }
   }
 }
