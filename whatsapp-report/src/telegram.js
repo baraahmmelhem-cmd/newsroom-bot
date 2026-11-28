@@ -148,6 +148,16 @@ async function usCalendar() {   // upcoming high-impact US events (Forex Factory
       }
     } catch (e) { console.log("[telegram] calendar", u, "failed:", e.message); }
   }
+  // Owner 28 Nov: the feed was empty over the US Thanksgiving week and the draft failed two days running.
+  // Known scheduled US events are added whenever the feed has nothing for those days.
+  const KNOWN = [
+    { day: "2026-11-30", title: "خروج Strategy من مؤشرات MSCI" },
+    { day: "2026-12-09", title: "قرار الفيدرالي بشأن الفائدة" },
+    { day: "2026-12-10", title: "تقرير التضخم الأميركي (CPI) لشهر نوفمبر" }
+  ];
+  const today = isoDay(new Date(Date.now() + 3 * 3600 * 1000));
+  for (const k of KNOWN) if (k.day > today && !out.some(o => o.day === k.day)) out.push({ day: k.day, title: k.title, forecast: "", previous: "" });
+  out.sort((x, y) => x.day < y.day ? -1 : 1);
   return out.slice(0, 12);
 }
 
@@ -296,7 +306,15 @@ async function buildDaily() {
   ].join("\n");
 
   const j = await askGemini(prompt);
-  for (const k of ["headline", "what", "econ", "next_date", "next_event"]) if (!j[k] || !String(j[k]).trim()) throw new Error("model left " + k + " empty");
+  for (const k of ["headline", "what", "econ"]) if (!j[k] || !String(j[k]).trim()) throw new Error("model left " + k + " empty");
+  // Owner 28 Nov: never drop the whole draft because the "what to watch" date is missing; use the next calendar event.
+  if (!j.next_date || !String(j.next_date).trim() || !j.next_event || !String(j.next_event).trim()) {
+    const nx = cal[0];
+    const AR_M = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"];
+    if (nx) { const [, m, d] = nx.day.split("-").map(Number); j.next_date = d + " " + AR_M[m - 1]; j.next_event = nx.title; }
+    else { j.next_date = "الأيام المقبلة"; j.next_event = "ردّة فعل الأسواق على هذا التطور"; }
+    console.log("[telegram] next_date was empty; using:", j.next_date, "-", j.next_event);
+  }
   const clean = v => (v == null || /^(null|none|لا يوجد|-)$/i.test(String(v).trim())) ? null : String(v).trim();
 
   const lines = ["الخبر في 3 أسطر", (/بيتكوين/.test(j.headline) ? "₿ " : "") + j.headline.trim(), "", "1) ماذا حدث؟", j.what.trim(), "", "2) لماذا يهم؟", "اقتصادياً: " + j.econ.trim()];
