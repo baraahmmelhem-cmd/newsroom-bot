@@ -247,4 +247,4 @@ if (require.main === module) {
   })();
 }
 
-module.exports = { buildMessages, important, arabicName };
+module.exports = { buildMessages, important, arabicName, loadEvents };

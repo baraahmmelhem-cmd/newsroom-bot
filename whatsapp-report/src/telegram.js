@@ -138,16 +138,17 @@ async function btcWeekRange() {   // 7-day high/low from CoinGecko and Kraken; b
   return res;
 }
 
-async function usCalendar() {   // upcoming high-impact US events (Forex Factory feed, same as calendar.js)
+async function usCalendar() {   // upcoming high-impact US events
+  // Owner 28 Nov: use the same complete source as the WhatsApp calendar (Forex Factory + TradingView fill-in, see calendar.js);
+  // Forex Factory alone has no next-week feed, so the drafts got an incomplete list.
   const out = [];
-  for (const u of ["https://nfs.faireconomy.media/ff_calendar_thisweek.json", "https://nfs.faireconomy.media/ff_calendar_nextweek.json"]) {
-    try {
-      for (const e of await get(u, true)) {
-        const d = new Date(e.date);
-        if (e.country === "USD" && e.impact === "High" && d > new Date()) out.push({ day: isoDay(new Date(d.getTime() + 3 * 3600 * 1000)), title: e.title, forecast: e.forecast || "", previous: e.previous || "" });
-      }
-    } catch (e) { console.log("[telegram] calendar", u, "failed:", e.message); }
-  }
+  try {
+    const { loadEvents, arabicName } = require("./calendar");
+    for (const e of await loadEvents()) {
+      if (e.impact !== "High" || !(e.d > new Date())) continue;
+      out.push({ day: isoDay(new Date(e.d.getTime() + 3 * 3600 * 1000)), title: arabicName(e.title), forecast: e.forecast || "", previous: e.previous || "" });
+    }
+  } catch (e) { console.log("[telegram] calendar failed:", e.message); }
   // Owner 28 Nov: the feed was empty over the US Thanksgiving week and the draft failed two days running.
   // Known scheduled US events are added whenever the feed has nothing for those days.
   const KNOWN = [
