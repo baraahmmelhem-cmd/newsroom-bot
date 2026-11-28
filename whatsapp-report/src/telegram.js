@@ -452,8 +452,9 @@ async function buildWeekly() {
     "- read1, read2: two short sentences on what the week meant (Mr_Amwal reading), based on DATA and HEADLINES.",
     "- politics: one sentence about a real political/regulatory factor of the week, or null.",
     "- watch: one sentence starting with الدولار that names what we watch in the dollar and bonds and the nearest important date from CALENDAR (written like 26 نوفمبر).",
+    "- week_events: for EVERY CALENDAR line dated within the next 7 days, an object {\"day\":\"YYYY-MM-DD\",\"title\":\"short Arabic name of the decision or data release\"}, in date order; [] if none.",
     "- refs: numbers of the headlines used. notes: Arabic notes about anything that needs confirmation.",
-    "Reply with JSON only: {\"n1_label\":\"\",\"read1\":\"\",\"read2\":\"\",\"politics\":null,\"watch\":\"\",\"refs\":[],\"notes\":[]}",
+    "Reply with JSON only: {\"n1_label\":\"\",\"read1\":\"\",\"read2\":\"\",\"politics\":null,\"watch\":\"\",\"week_events\":[],\"refs\":[],\"notes\":[]}",
     "", "DATA:", ...data, "", "CALENDAR:", ...(calLines.length ? calLines : ["none found"]), "", "HEADLINES (last 7 days):", ...list
   ].join("\n");
   const j = await askGemini(prompt);
@@ -470,7 +471,21 @@ async function buildWeekly() {
     "", "قراءة Mr_Amwal", j.read1.trim(), j.read2.trim()
   ];
   if (pol) lines.push("سياسياً: " + pol);
-  lines.push("نراقب: " + j.watch.trim().replace(/^نراقب:?\s*/, ""), "", DISCLAIMER);
+  lines.push("نراقب: " + j.watch.trim().replace(/^نراقب:?\s*/, ""));
+  // Owner 28 Nov: Saturday post also lists the decisions and data expected in the coming week.
+  {
+    const AR_M = ["يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو", "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر"];
+    const arDay = d => { const [, m, dd] = d.split("-").map(Number); return dd + " " + AR_M[m - 1]; };
+    const today = isoDay(new Date(Date.now() + 3 * 3600 * 1000));
+    const end = isoDay(new Date(Date.now() + 3 * 3600 * 1000 + 7 * 86400 * 1000));
+    const inWeek = d => /^\d{4}-\d{2}-\d{2}$/.test(d || "") && d > today && d <= end;
+    let ev = (Array.isArray(j.week_events) ? j.week_events : []).filter(e => e && inWeek(String(e.day)) && String(e.title || "").trim() && cal.some(c => c.day === String(e.day)));
+    if (!ev.length) ev = cal.filter(c => inWeek(c.day));
+    const seen = new Set();
+    ev = ev.filter(e => { const k = e.day + "|" + String(e.title).trim(); if (seen.has(k)) return false; seen.add(k); return true; }).sort((x, y) => String(x.day) < String(y.day) ? -1 : 1).slice(0, 6);
+    if (ev.length) lines.push("", "📅 أبرز المواعيد هذا الأسبوع:", ...ev.map(e => "• " + arDay(String(e.day)) + ": " + String(e.title).trim()));
+  }
+  lines.push("", DISCLAIMER);
 
   const srcs = (j.refs || []).map(n => heads[Number(n) - 1]).filter(Boolean);
   const blob = data.join("\n") + "\n" + calLines.join("\n") + "\n" + heads.map(h => h.title).join("\n");
